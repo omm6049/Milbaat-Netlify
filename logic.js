@@ -3822,7 +3822,7 @@ async function startCall(video, isIncoming = false) {
             if (ringingTimeout) clearTimeout(ringingTimeout);
             ringingTimeout = setTimeout(() => {
                 endCall(); 
-            }, 10000);
+            }, 15000);
         }
         
         return true;
