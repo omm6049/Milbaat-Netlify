@@ -1089,7 +1089,8 @@
     <!-- 1. The Entry Overlay -->
     <div id="entry-overlay">
         <div class="login-container" id="loginMainBox">
-            <img src="Mil%20Baat%20Logo.png" alt="Mil Baat Logo" style="width: 100px; margin-bottom: 20px; border-radius: 50%; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+            <img id="landingLogo" src="Mil%20Baat%20Logo.png" alt="Mil Baat Logo" style="width: 100px; margin-bottom: 20px; border-radius: 50%; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+
             <!-- Traditional Login View -->
             <div id="user-pass-view" style="display: flex; width: 100%; flex-direction: column; align-items: center;">
                 <input type="text" class="login-input" id="usernameInput" placeholder="Enter Username" style="width: 100%;">
@@ -1099,31 +1100,47 @@
                 <button class="accept-btn" id="acceptBtn" style="width: 100%;">LOGIN</button>
             </div>
 
-            <!-- Facelock Sub-Selection -->
-            <div id="facelock-sub-selection" style="display: none; width: 100%; flex-direction: column; gap: 15px;">
-                <button class="accept-btn" id="facelockSignupBtn" style="width: 100%;">Signup for Facelock</button>
-                <button class="accept-btn" id="facelockSigninBtn" style="width: 100%; background: #27ae60;">Sign in for Facelock</button>
-                <span class="back-to-login" style="color: #00d2ff; cursor: pointer; font-size: 0.85rem; text-decoration: underline; text-align: center;">Back</span>
-            </div>
-
-            <!-- Facelock Signup Form -->
-            <div id="facelock-signup-view" style="display: none; width: 100%; flex-direction: column; align-items: center;">
-                <input type="text" class="login-input" id="faceSignupUser" placeholder="User ID" style="width: 100%;">
-                <input type="password" class="login-input" id="faceSignupPass" placeholder="Password" style="width: 100%;">
-                <input type="text" class="login-input" id="faceSignupKey" placeholder="Unique Passkey" style="width: 100%;">
-                <button class="accept-btn" id="faceSignupNextBtn" style="width: 100%;">Confirm & Next</button>
-                <span class="back-to-facelock" style="color: #00d2ff; cursor: pointer; font-size: 0.85rem; text-decoration: underline; margin-top: 15px;">Back</span>
-            </div>
-
-            <!-- Facelock Camera Scanner -->
-            <div id="facelock-scanner-view" style="display: none; width: 100%; flex-direction: column; align-items: center;">
-                <div style="width: 200px; height: 200px; border-radius: 50%; overflow: hidden; border: 3px solid #00d2ff; margin-bottom: 15px; position: relative; background: #000;">
+            <!-- Facelock Main Page -->
+            <div id="facelock-view" style="display: none; width: 100%; flex-direction: column; align-items: center;">
+                <!-- Branding -->
+                <div style="text-align: center; margin-bottom: 15px; font-family: 'Cinzel', serif;">
+                    <h2 style="margin: 0; font-size: 1.1rem; color: #f1c40f; font-weight: 700; letter-spacing: 1px;">MINISTRY OF DEFENCE</h2>
+                    <h4 style="margin: 3px 0 0 0; font-size: 0.65rem; color: rgba(255,255,255,0.8); letter-spacing: 1.5px; text-transform: uppercase;">Government of India</h4>
+                </div>
+                
+                <!-- Scanner Container -->
+                <div style="width: 180px; height: 180px; border-radius: 50%; overflow: hidden; border: 3px solid #00d2ff; margin-bottom: 15px; position: relative; background: #000;">
                     <video id="faceScanVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
                     <div id="faceScanLine" style="position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: #00ff00; box-shadow: 0 0 10px #00ff00; animation: scanMove 2s infinite linear;"></div>
                 </div>
-                <div id="faceScanStatus" style="color: #00d2ff; margin-bottom: 10px; font-size: 0.9rem;">Initializing camera...</div>
-                <button class="accept-btn" id="faceCaptureBtn" style="width: 100%;">Scan & Login</button>
-                <span class="back-to-facelock" id="stopFaceScanBtn" style="color: #ff6b6b; cursor: pointer; font-size: 0.85rem; text-decoration: underline; margin-top: 15px;">Cancel</span>
+                
+                <div id="faceScanPercentage" style="font-size: 1.3rem; font-weight: bold; color: #00d2ff; margin-bottom: 3px;">0%</div>
+                <div id="faceScanStatus" style="color: #00d2ff; margin-bottom: 15px; font-size: 0.8rem; font-weight: 500;">Ready to scan</div>
+
+                <button class="accept-btn" id="faceCaptureBtn" style="width: 100%; display: none; margin-bottom: 15px;">Submit</button>
+
+                <!-- Action Links Grid -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; text-align: center;">
+                    <span id="faceVerifyLink" style="color: #00d2ff; cursor: pointer; font-size: 0.95rem; text-decoration: underline; font-weight: bold;">Verify</span>
+                    <span id="faceRegisterLink" style="color: #00d2ff; cursor: pointer; font-size: 0.95rem; text-decoration: underline; font-weight: bold;">Register</span>
+                    
+                    <span id="faceRetryLink" style="color: #f39c12; cursor: pointer; font-size: 0.85rem; text-decoration: underline; visibility: hidden;">Retry</span>
+                    <span id="faceBackLink" style="color: #ff6b6b; cursor: pointer; font-size: 0.85rem; text-decoration: underline;">Back</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Facelock Registration Credentials Modal -->
+    <div id="facelock-creds-modal" class="modal-overlay" style="z-index: 10015;">
+        <div class="modal-box" style="background: #1a1a2e; border: 1px solid #00d2ff;">
+            <h3 style="color: #00d2ff; margin-bottom: 15px;">Facelock Registration</h3>
+            <input type="text" class="login-input" id="faceSignupUser" placeholder="User ID" style="width: 100%;">
+            <input type="password" class="login-input" id="faceSignupPass" placeholder="Password" style="width: 100%;">
+            <input type="text" class="login-input" id="faceSignupKey" placeholder="Unique Passkey" style="width: 100%;">
+            <div class="modal-actions">
+                <button class="modal-btn cancel-btn" id="cancelFaceCredsBtn">Cancel</button>
+                <button class="modal-btn confirm-btn" id="confirmFaceCredsBtn" style="background: #00d2ff;">Next</button>
             </div>
         </div>
     </div>

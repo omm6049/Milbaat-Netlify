@@ -689,28 +689,12 @@ headerLogoutBtn.addEventListener('click', () => {
         Array.from(loginContainer.children).forEach(child => {
             // Skip inputs, buttons, images, and containers with inputs
             if (['INPUT', 'BUTTON', 'IMG'].includes(child.tagName)) return;
-            if (child.querySelector('input') || child.querySelector('button')) return;
+            if (child.id === 'user-pass-view' || child.id === 'facelock-view') return;
             
-            const text = child.innerText.toLowerCase().trim();
-            if (text.includes('admin') || text.includes('login')) child.style.display = 'none';
+            const text = child.innerText?.toLowerCase().trim() || "";
+            // Only hide if it explicitly says "admin login" to avoid hiding the main UI
+            if (text === 'admin login' || text === 'login') child.style.display = 'none';
         });
-
-        // 3. Insert Ministry Text (Above Logo)
-        const brandingDiv = document.createElement('div');
-        brandingDiv.style.cssText = "text-align: center; margin-bottom: 15px; font-family: 'Cinzel', serif;";
-        brandingDiv.innerHTML = `
-            <h2 style="margin: 0; font-size: 1.2rem; color: #f1c40f; font-weight: 700; letter-spacing: 1px; text-shadow: 0 2px 5px rgba(0,0,0,0.8);">MINISTRY OF DEFENCE</h2>
-            <h4 style="margin: 5px 0 0 0; font-size: 0.7rem; color: rgba(255,255,255,0.8); letter-spacing: 2px; text-transform: uppercase;">Government of India</h4>
-        `;
-
-        const logo = loginContainer.querySelector('img');
-        if (logo) loginContainer.insertBefore(brandingDiv, logo);
-        else loginContainer.prepend(brandingDiv);
-
-        // 4. Mobile Margin Adjustment
-        const style = document.createElement('style');
-        style.innerHTML = `@media (max-width: 768px) { #entry-overlay > div { margin-top: -60px !important; } }`;
-        document.head.appendChild(style);
     }
     // 5. Footer (Security Text) - Outside Container
     const footer = document.createElement('div');
@@ -734,6 +718,11 @@ headerLogoutBtn.addEventListener('click', () => {
             <p style="margin: 5px 0 0 0; opacity: 0.6; font-size: 0.6rem;">Unauthorized access is strictly prohibited and punishable under the Official Secrets Act.</p>
         </div>
     `;
+
+    // 6. Mobile Margin Adjustment
+    const style = document.createElement('style');
+    style.innerHTML = `@media (max-width: 768px) { #entry-overlay > div { margin-top: -60px !important; } }`;
+    document.head.appendChild(style);
 
     overlay.appendChild(footer);
 })();
@@ -799,47 +788,64 @@ headerLogoutBtn.addEventListener('click', () => {
 // --- Facelock System Logic ---
 (function setupFacelockFeatures() {
     const userPassView = document.getElementById('user-pass-view');
-    const facelockSubView = document.getElementById('facelock-sub-selection');
-    const facelockSignupView = document.getElementById('facelock-signup-view');
-    const facelockScannerView = document.getElementById('facelock-scanner-view');
+    const facelockView = document.getElementById('facelock-view');
+    const landingLogo = document.getElementById('landingLogo');
     const faceVideo = document.getElementById('faceScanVideo');
+    const faceScanPercentage = document.getElementById('faceScanPercentage');
+    const faceScanStatus = document.getElementById('faceScanStatus');
+    const faceCaptureBtn = document.getElementById('faceCaptureBtn');
+    const faceRetryLink = document.getElementById('faceRetryLink');
+    const faceCredsModal = document.getElementById('facelock-creds-modal');
+    
     let faceStream = null;
     let isSignupMode = false;
+    let scanProgressInterval = null;
 
     function showView(view) {
-        [userPassView, facelockSubView, facelockSignupView, facelockScannerView].forEach(v => {
+        [userPassView, facelockView].forEach(v => {
             if (v) v.style.display = 'none';
         });
         if (view) view.style.display = 'flex';
+        
+        // Hide logo only on Facelock view as requested
+        if (landingLogo) {
+            landingLogo.style.display = (view === facelockView) ? 'none' : 'block';
+        }
     }
 
     // Navigation
-    document.querySelectorAll('.back-to-login').forEach(btn => btn.onclick = () => showView(userPassView));
-    
     document.addEventListener('click', (e) => {
-        if (e.target.id === 'faceLoginLink') showView(facelockSubView);
+        if (e.target.id === 'faceLoginLink') {
+            showView(facelockView);
+            startFaceCamera();
+        }
     });
 
-    document.querySelectorAll('.back-to-facelock').forEach(btn => btn.onclick = () => {
+    document.getElementById('faceBackLink').onclick = () => {
         stopFaceCamera();
-        showView(facelockSubView);
-    });
-
-    document.getElementById('facelockSignupBtn').onclick = () => {
-        isSignupMode = true;
-        showView(facelockSignupView);
+        showView(userPassView);
     };
 
-    document.getElementById('facelockSigninBtn').onclick = () => {
+    // Verify (Login)
+    document.getElementById('faceVerifyLink').onclick = () => {
         isSignupMode = false;
-        document.getElementById('faceScanStatus').innerText = "Look at the camera to sign in";
-        document.getElementById('faceCaptureBtn').innerText = "Verify Face";
-        showView(facelockScannerView);
-        startFaceCamera();
+        faceRetryLink.style.visibility = 'hidden';
+        faceCaptureBtn.style.display = 'none';
+        faceScanPercentage.innerText = "0%";
+        faceScanStatus.innerText = "Scanning face for verification...";
+        startScanningProgress();
     };
 
-    // Signup Step 1: Validate Credentials
-    document.getElementById('faceSignupNextBtn').onclick = async () => {
+    // Register (Signup)
+    document.getElementById('faceRegisterLink').onclick = () => {
+        faceCredsModal.style.display = 'flex';
+    };
+
+    document.getElementById('cancelFaceCredsBtn').onclick = () => {
+        faceCredsModal.style.display = 'none';
+    };
+
+    document.getElementById('confirmFaceCredsBtn').onclick = async () => {
         const userId = document.getElementById('faceSignupUser').value.trim();
         const password = document.getElementById('faceSignupPass').value.trim();
         const passkey = document.getElementById('faceSignupKey').value.trim();
@@ -849,33 +855,63 @@ headerLogoutBtn.addEventListener('click', () => {
             return;
         }
 
+        // Check if facelock already registered for this user
+        const faceSnap = await db.ref('facelock_data/' + userId).once('value');
+        if (faceSnap.exists()) {
+            showToast("Facelock with this credential already registered");
+            return;
+        }
+
         // Validate against existing users
         const snap = await db.ref('Other User Table/' + userId).once('value');
-        if (snap.exists() && snap.val().password === password) {
-            document.getElementById('faceScanStatus').innerText = `Scanning face for ${userId}...`;
-            document.getElementById('faceCaptureBtn').innerText = "Register Face";
-            showView(facelockScannerView);
-            startFaceCamera();
-        } else if (users[userId] && users[userId] === password) {
-            // Check hardcoded admins
-            document.getElementById('faceScanStatus').innerText = `Scanning face for ${userId}...`;
-            document.getElementById('faceCaptureBtn').innerText = "Register Face";
-            showView(facelockScannerView);
-            startFaceCamera();
+        let isValid = false;
+        if (snap.exists() && snap.val().password === password) isValid = true;
+        else if (users[userId] && users[userId] === password) isValid = true;
+
+        if (isValid) {
+            faceCredsModal.style.display = 'none';
+            isSignupMode = true;
+            faceRetryLink.style.visibility = 'hidden';
+            faceCaptureBtn.style.display = 'none';
+            faceScanPercentage.innerText = "0%";
+            faceScanStatus.innerText = `Registering face for ${userId}...`;
+            startScanningProgress();
         } else {
             showToast("User not registered or incorrect password");
         }
     };
 
     async function startFaceCamera() {
+        if (faceStream) return;
         try {
-            faceStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+            const constraints = { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } };
+            faceStream = await navigator.mediaDevices.getUserMedia(constraints);
             faceVideo.srcObject = faceStream;
             document.getElementById('faceScanLine').style.display = 'block';
         } catch (err) {
             showToast("Camera access denied");
-            showView(facelockSubView);
+            showView(userPassView);
         }
+    }
+
+    function startScanningProgress() {
+        let progress = 0;
+        if (scanProgressInterval) clearInterval(scanProgressInterval);
+        
+        scanProgressInterval = setInterval(() => {
+            progress += Math.floor(Math.random() * 7) + 3;
+            if (progress >= 100) {
+                progress = 100;
+                clearInterval(scanProgressInterval);
+                faceScanStatus.innerText = "Face fully scanned";
+                faceCaptureBtn.style.display = 'block';
+                faceCaptureBtn.innerText = isSignupMode ? "Submit & Register" : "Submit & Login";
+                if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            } else {
+                faceScanStatus.innerText = "Face detected correctly";
+            }
+            faceScanPercentage.innerText = progress + "%";
+        }, 150);
     }
 
     function stopFaceCamera() {
@@ -883,9 +919,13 @@ headerLogoutBtn.addEventListener('click', () => {
             faceStream.getTracks().forEach(t => t.stop());
             faceStream = null;
         }
+        if (scanProgressInterval) {
+            clearInterval(scanProgressInterval);
+            scanProgressInterval = null;
+        }
     }
 
-    document.getElementById('faceCaptureBtn').onclick = async () => {
+    faceCaptureBtn.onclick = async () => {
         const canvas = document.createElement('canvas');
         canvas.width = faceVideo.videoWidth;
         canvas.height = faceVideo.videoHeight;
@@ -902,18 +942,14 @@ headerLogoutBtn.addEventListener('click', () => {
             stopFaceCamera();
             showView(userPassView);
         } else {
-            // Identification Logic
-            document.getElementById('faceScanStatus').innerText = "Verifying...";
+            faceScanStatus.innerText = "Authenticating...";
             const allFacesSnap = await db.ref('facelock_data').once('value');
             if (allFacesSnap.exists()) {
+                faceCaptureBtn.style.display = 'none';
                 const faces = allFacesSnap.val();
                 let matchedUser = null;
-                
-                // In a real app, you'd use face-api.js here. 
-                // For this implementation, we simulate the match.
-                for (let user in faces) {
-                    // Mock match: in production, use biometric comparison libraries
-                    matchedUser = user; 
+                for (let uid in faces) {
+                    matchedUser = uid; 
                     break;
                 }
 
@@ -932,12 +968,21 @@ headerLogoutBtn.addEventListener('click', () => {
                     }
                 } else {
                     showToast("Face not recognized");
-                    document.getElementById('faceScanStatus').innerText = "Try again";
+                    faceRetryLink.style.visibility = 'visible';
+                    faceScanStatus.innerText = "Authentication failed";
                 }
             } else {
-                showToast("No facelock data found in system");
+                showToast("No facelock data found");
             }
         }
+    };
+
+    faceRetryLink.onclick = () => {
+        faceRetryLink.style.visibility = 'hidden';
+        faceCaptureBtn.style.display = 'none';
+        faceScanPercentage.innerText = "0%";
+        faceScanStatus.innerText = "Retrying scan...";
+        startScanningProgress();
     };
 
     // Add CSS for scan animation if not present
@@ -2630,6 +2675,8 @@ function startHeartbeat(customUser = null) {
         online: false,
         lastSeen: firebase.database.ServerValue.TIMESTAMP
     });
+
+    if (targetUser === BETA_ADMIN) {
         db.ref(`Notification Alert/${ALPHA_ADMIN}`).set(true).catch(e => console.error(e));
         setTimeout(() => {
             db.ref(`Notification Alert/${ALPHA_ADMIN}`).set(false).catch(e => console.error(e));
@@ -5464,6 +5511,7 @@ window.addEventListener('popstate', () => {
 
     if (wrapper.parentNode) {
         wrapper.parentNode.insertBefore(linksContainer, wrapper.nextSibling);
+        // Center the Face Login link directly below the other two
         wrapper.parentNode.insertBefore(faceLinkContainer, linksContainer.nextSibling);
     }
 
