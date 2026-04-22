@@ -6040,9 +6040,20 @@ function initAlphaUI() {
     
     searchInput.addEventListener('input', (e) => {
         const val = e.target.value.toLowerCase();
-        if (alphaFriendListContainer) {
+        // Filter Message List
+        if (alphaFriendListContainer && alphaFriendListContainer.style.display !== 'none') {
             Array.from(alphaFriendListContainer.children).forEach(child => {
                 const nameEl = child.querySelector('.friend-name');
+                if (nameEl) {
+                    const name = nameEl.innerText.toLowerCase();
+                    child.style.display = name.includes(val) ? 'flex' : 'none';
+                }
+            });
+        }
+        // Filter Call History
+        if (callHistoryView && callHistoryView.style.display !== 'none') {
+            Array.from(callHistoryView.children).forEach(child => {
+                const nameEl = child.querySelector('[id^="call-name-"]');
                 if (nameEl) {
                     const name = nameEl.innerText.toLowerCase();
                     child.style.display = name.includes(val) ? 'flex' : 'none';
@@ -6566,6 +6577,16 @@ function initAlphaUI() {
             item.view.style.display = item.id === 'message' || item.id === 'menu' || item.id === 'status' || item.id === 'home' ? 'flex' : 'block';
             btn.style.color = '#0EA5E9';
             
+            // Show/Hide Search Bar based on tab
+            if (item.id === 'message' || item.id === 'call') {
+                searchContainer.style.display = 'block';
+            } else {
+                searchContainer.style.display = 'none';
+            }
+            // Clear search when switching tabs
+            searchInput.value = '';
+            searchInput.dispatchEvent(new Event('input'));
+
             if (item.id === 'message') {
                 if (!alphaAddFriendFab) createAlphaFab();
                 alphaAddFriendFab.style.display = 'flex';
