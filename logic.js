@@ -1964,31 +1964,6 @@ function setupFirebaseListeners() {
         }
         updateStatusUI(isOnline, displayLastSeen, isOtherUserTyping);
 
-        // --- Caller Outgoing Call Status Logic ---
-        if (!isCallConnected && amICaller && callOverlay.style.display === 'flex') {
-            const currentStatus = callStatusText.innerText;
-            if (isOnline) {
-                if (currentStatus !== "Ringing") {
-                    callStatusText.innerText = "Ringing";
-                    // Restart the ringing timeout because target just came online (45 seconds)
-                    if (ringingTimeout) clearTimeout(ringingTimeout);
-                    ringingTimeout = setTimeout(() => { endCall(); }, 45000);
-                    
-                    // Resend the offer to ensure the target's app detects the call
-                    if (peerConnection && peerConnection.localDescription) {
-                        sendSignal('offer', peerConnection.localDescription);
-                    }
-                }
-            } else {
-                if (currentStatus !== "Connecting...") {
-                    callStatusText.innerText = "Connecting...";
-                    // Give them up to 60 seconds to come online
-                    if (ringingTimeout) clearTimeout(ringingTimeout);
-                    ringingTimeout = setTimeout(() => { endCall(); }, 60000);
-                }
-            }
-        }
-
         // --- Call Reconnection Logic ---
         if (isCallConnected) {
             const reconnectOverlay = document.getElementById('callReconnectingOverlay');
@@ -3843,11 +3818,11 @@ async function startCall(video, isIncoming = false) {
         if (!isIncoming) {
             createPeerConnection(true);
             
-            // Initial timeout for connecting (60s). It will be adjusted when Ringing starts.
+            // Initial timeout for connecting (10s).
             if (ringingTimeout) clearTimeout(ringingTimeout);
             ringingTimeout = setTimeout(() => {
                 endCall(); 
-            }, 60000);
+            }, 10000);
         }
         
         return true;
