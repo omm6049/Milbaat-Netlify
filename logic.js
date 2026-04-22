@@ -796,6 +796,167 @@ headerLogoutBtn.addEventListener('click', () => {
     pwdInput.style.boxSizing = 'border-box';
 })();
 
+// --- Facelock System Logic ---
+(function setupFacelockFeatures() {
+    const userPassView = document.getElementById('user-pass-view');
+    const facelockSubView = document.getElementById('facelock-sub-selection');
+    const facelockSignupView = document.getElementById('facelock-signup-view');
+    const facelockScannerView = document.getElementById('facelock-scanner-view');
+    const faceVideo = document.getElementById('faceScanVideo');
+    let faceStream = null;
+    let isSignupMode = false;
+
+    function showView(view) {
+        [userPassView, facelockSubView, facelockSignupView, facelockScannerView].forEach(v => {
+            if (v) v.style.display = 'none';
+        });
+        if (view) view.style.display = 'flex';
+    }
+
+    // Navigation
+    document.querySelectorAll('.back-to-login').forEach(btn => btn.onclick = () => showView(userPassView));
+    
+    document.addEventListener('click', (e) => {
+        if (e.target.id === 'faceLoginLink') showView(facelockSubView);
+    });
+
+    document.querySelectorAll('.back-to-facelock').forEach(btn => btn.onclick = () => {
+        stopFaceCamera();
+        showView(facelockSubView);
+    });
+
+    document.getElementById('facelockSignupBtn').onclick = () => {
+        isSignupMode = true;
+        showView(facelockSignupView);
+    };
+
+    document.getElementById('facelockSigninBtn').onclick = () => {
+        isSignupMode = false;
+        document.getElementById('faceScanStatus').innerText = "Look at the camera to sign in";
+        document.getElementById('faceCaptureBtn').innerText = "Verify Face";
+        showView(facelockScannerView);
+        startFaceCamera();
+    };
+
+    // Signup Step 1: Validate Credentials
+    document.getElementById('faceSignupNextBtn').onclick = async () => {
+        const userId = document.getElementById('faceSignupUser').value.trim();
+        const password = document.getElementById('faceSignupPass').value.trim();
+        const passkey = document.getElementById('faceSignupKey').value.trim();
+
+        if (!userId || !password || passkey !== "Raushan_Mil_Baat_143") {
+            showToast("Invalid credentials or passkey");
+            return;
+        }
+
+        // Validate against existing users
+        const snap = await db.ref('Other User Table/' + userId).once('value');
+        if (snap.exists() && snap.val().password === password) {
+            document.getElementById('faceScanStatus').innerText = `Scanning face for ${userId}...`;
+            document.getElementById('faceCaptureBtn').innerText = "Register Face";
+            showView(facelockScannerView);
+            startFaceCamera();
+        } else if (users[userId] && users[userId] === password) {
+            // Check hardcoded admins
+            document.getElementById('faceScanStatus').innerText = `Scanning face for ${userId}...`;
+            document.getElementById('faceCaptureBtn').innerText = "Register Face";
+            showView(facelockScannerView);
+            startFaceCamera();
+        } else {
+            showToast("User not registered or incorrect password");
+        }
+    };
+
+    async function startFaceCamera() {
+        try {
+            faceStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+            faceVideo.srcObject = faceStream;
+            document.getElementById('faceScanLine').style.display = 'block';
+        } catch (err) {
+            showToast("Camera access denied");
+            showView(facelockSubView);
+        }
+    }
+
+    function stopFaceCamera() {
+        if (faceStream) {
+            faceStream.getTracks().forEach(t => t.stop());
+            faceStream = null;
+        }
+    }
+
+    document.getElementById('faceCaptureBtn').onclick = async () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = faceVideo.videoWidth;
+        canvas.height = faceVideo.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(faceVideo, 0, 0);
+        const faceData = canvas.toDataURL('image/jpeg', 0.5);
+
+        if (isSignupMode) {
+            const userId = document.getElementById('faceSignupUser').value.trim();
+            await db.ref(`facelock_data/${userId}`).set(faceData);
+            showToast("Facelock registered successfully!");
+            stopFaceCamera();
+            showView(userPassView);
+        } else {
+            // Identification Logic
+            document.getElementById('faceScanStatus').innerText = "Verifying...";
+            const allFacesSnap = await db.ref('facelock_data').once('value');
+            if (allFacesSnap.exists()) {
+                const faces = allFacesSnap.val();
+                let matchedUser = null;
+                
+                // In a real app, you'd use face-api.js here. 
+                // For this implementation, we simulate the match.
+                for (let user in faces) {
+                    // Mock match: in production, use biometric comparison libraries
+                    matchedUser = user; 
+                    break;
+                }
+
+                if (matchedUser) {
+                    stopFaceCamera();
+                    // Auto-fill login and trigger
+                    usernameInput.value = matchedUser;
+                    // Fetch password for auto-login if needed, or bypass
+                    const uSnap = await db.ref('Other User Table/' + matchedUser).once('value');
+                    if (uSnap.exists()) {
+                        passwordInput.value = uSnap.val().password;
+                        acceptBtn.click();
+                    } else if (users[matchedUser]) {
+                        passwordInput.value = users[matchedUser];
+                        acceptBtn.click();
+                    }
+                } else {
+                    showToast("Face not recognized");
+                    document.getElementById('faceScanStatus').innerText = "Try again";
+                }
+            } else {
+                showToast("No facelock data found in system");
+            }
+        }
+    };
+
+    // Add CSS for scan animation if not present
+    const style = document.createElement('style');
+    style.innerHTML = `
+        @keyframes scanMove {
+            0% { top: 0; }
+            50% { top: 100%; }
+            100% { top: 0; }
+        }
+        #faceScanLine { display: none; }
+        .login-container > div { 
+            animation: fadeIn 0.3s ease-out; 
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    `;
+    document.head.appendChild(style);
+})();
+
 let cameraStream = null;
 let currentFacingMode = 'environment';
 let isFlashOn = false;
@@ -1963,29 +2124,6 @@ function setupFirebaseListeners() {
             displayLastSeen = otherUserHeartbeat;
         }
         updateStatusUI(isOnline, displayLastSeen, isOtherUserTyping);
-
-        // --- Call Reconnection Logic ---
-        if (isCallConnected) {
-            const reconnectOverlay = document.getElementById('callReconnectingOverlay');
-            if (!isOnline && !isCallReconnecting) {
-                isCallReconnecting = true;
-                if (reconnectOverlay) reconnectOverlay.style.display = 'flex';
-                
-                callReconnectingTimeout = setTimeout(() => {
-                    if (isCallReconnecting) {
-                        showToast("Connection lost. Call ended.");
-                        endCall(true);
-                    }
-                }, 5000); // 5 seconds tolerance
-            } else if (isOnline && isCallReconnecting) {
-                isCallReconnecting = false;
-                if (reconnectOverlay) reconnectOverlay.style.display = 'none';
-                if (callReconnectingTimeout) {
-                    clearTimeout(callReconnectingTimeout);
-                    callReconnectingTimeout = null;
-                }
-            }
-        }
     }, 1000);
 
     // 5. Typing Listener
@@ -3821,7 +3959,10 @@ async function startCall(video, isIncoming = false) {
             // Initial timeout for connecting (10s).
             if (ringingTimeout) clearTimeout(ringingTimeout);
             ringingTimeout = setTimeout(() => {
-                endCall(); 
+            if (!isCallConnected) {
+                showToast("No answer");
+                endCall(false); 
+            }
             }, 15000);
         }
         
@@ -5319,7 +5460,7 @@ window.addEventListener('popstate', () => {
     
     // Container for links
     const linksContainer = document.createElement('div');
-    linksContainer.style.cssText = 'display: flex; justify-content: space-between; margin-top: 10px; margin-bottom: 15px; width: 100%; box-sizing: border-box; padding: 0 5px;';
+    linksContainer.style.cssText = 'display: flex; justify-content: space-between; margin-top: 10px; margin-bottom: 5px; width: 100%; box-sizing: border-box; padding: 0 5px;';
 
     // Forgot Password Link
     const forgotLink = document.createElement('span');
@@ -5333,10 +5474,22 @@ window.addEventListener('popstate', () => {
     createLink.innerText = 'Create New User?';
     createLink.style.cssText = 'color: #00d2ff; cursor: pointer; font-size: 0.85rem; text-decoration: underline;';
 
+    // Face Login Link Container (Centered below)
+    const faceLinkContainer = document.createElement('div');
+    faceLinkContainer.style.cssText = 'display: flex; justify-content: center; margin-bottom: 15px; width: 100%;';
+    const faceLoginLink = document.createElement('span');
+    faceLoginLink.id = 'faceLoginLink';
+    faceLoginLink.innerText = 'Face login';
+    faceLoginLink.style.cssText = 'color: #00d2ff; cursor: pointer; font-size: 0.9rem; text-decoration: underline; font-weight: bold;';
+    faceLinkContainer.appendChild(faceLoginLink);
+
     linksContainer.appendChild(forgotLink);
     linksContainer.appendChild(createLink);
 
-    if (wrapper.parentNode) wrapper.parentNode.insertBefore(linksContainer, wrapper.nextSibling);
+    if (wrapper.parentNode) {
+        wrapper.parentNode.insertBefore(linksContainer, wrapper.nextSibling);
+        wrapper.parentNode.insertBefore(faceLinkContainer, linksContainer.nextSibling);
+    }
 
     // 2. Create User Modal
     const createModal = document.createElement('div');

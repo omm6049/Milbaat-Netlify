@@ -1088,13 +1088,43 @@
 
     <!-- 1. The Entry Overlay -->
     <div id="entry-overlay">
-        <div class="login-container">
+        <div class="login-container" id="loginMainBox">
             <img src="Mil%20Baat%20Logo.png" alt="Mil Baat Logo" style="width: 100px; margin-bottom: 20px; border-radius: 50%; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
-            <input type="text" class="login-input" id="usernameInput" placeholder="Enter Username">
-            <div id="usernameError" class="error-msg">First Enter user name</div>
-            <input type="password" class="login-input" id="passwordInput" placeholder="Enter Password">
-            <div id="passwordError" class="error-msg">Please Enter Password</div>
-            <button class="accept-btn" id="acceptBtn">LOGIN</button>
+            <!-- Traditional Login View -->
+            <div id="user-pass-view" style="display: flex; width: 100%; flex-direction: column; align-items: center;">
+                <input type="text" class="login-input" id="usernameInput" placeholder="Enter Username" style="width: 100%;">
+                <div id="usernameError" class="error-msg">First Enter user name</div>
+                <input type="password" class="login-input" id="passwordInput" placeholder="Enter Password" style="width: 100%;">
+                <div id="passwordError" class="error-msg">Please Enter Password</div>
+                <button class="accept-btn" id="acceptBtn" style="width: 100%;">LOGIN</button>
+            </div>
+
+            <!-- Facelock Sub-Selection -->
+            <div id="facelock-sub-selection" style="display: none; width: 100%; flex-direction: column; gap: 15px;">
+                <button class="accept-btn" id="facelockSignupBtn" style="width: 100%;">Signup for Facelock</button>
+                <button class="accept-btn" id="facelockSigninBtn" style="width: 100%; background: #27ae60;">Sign in for Facelock</button>
+                <span class="back-to-login" style="color: #00d2ff; cursor: pointer; font-size: 0.85rem; text-decoration: underline; text-align: center;">Back</span>
+            </div>
+
+            <!-- Facelock Signup Form -->
+            <div id="facelock-signup-view" style="display: none; width: 100%; flex-direction: column; align-items: center;">
+                <input type="text" class="login-input" id="faceSignupUser" placeholder="User ID" style="width: 100%;">
+                <input type="password" class="login-input" id="faceSignupPass" placeholder="Password" style="width: 100%;">
+                <input type="text" class="login-input" id="faceSignupKey" placeholder="Unique Passkey" style="width: 100%;">
+                <button class="accept-btn" id="faceSignupNextBtn" style="width: 100%;">Confirm & Next</button>
+                <span class="back-to-facelock" style="color: #00d2ff; cursor: pointer; font-size: 0.85rem; text-decoration: underline; margin-top: 15px;">Back</span>
+            </div>
+
+            <!-- Facelock Camera Scanner -->
+            <div id="facelock-scanner-view" style="display: none; width: 100%; flex-direction: column; align-items: center;">
+                <div style="width: 200px; height: 200px; border-radius: 50%; overflow: hidden; border: 3px solid #00d2ff; margin-bottom: 15px; position: relative; background: #000;">
+                    <video id="faceScanVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
+                    <div id="faceScanLine" style="position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: #00ff00; box-shadow: 0 0 10px #00ff00; animation: scanMove 2s infinite linear;"></div>
+                </div>
+                <div id="faceScanStatus" style="color: #00d2ff; margin-bottom: 10px; font-size: 0.9rem;">Initializing camera...</div>
+                <button class="accept-btn" id="faceCaptureBtn" style="width: 100%;">Scan & Login</button>
+                <span class="back-to-facelock" id="stopFaceScanBtn" style="color: #ff6b6b; cursor: pointer; font-size: 0.85rem; text-decoration: underline; margin-top: 15px;">Cancel</span>
+            </div>
         </div>
     </div>
 
@@ -1327,14 +1357,6 @@
             <div class="profile-pic" style="width: 150px; height: 150px; border: 4px solid rgba(255,255,255,0.2); margin-bottom: 20px;">
                 <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
             </div>
-        </div>
-
-        <!-- Reconnecting Overlay -->
-        <div id="callReconnectingOverlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(26, 26, 46, 0.95); z-index: 15; display: none; flex-direction: column; align-items: center; justify-content: center; color: #00d2ff; backdrop-filter: blur(10px);">
-            <div style="font-size: 2rem; font-weight: bold; margin-bottom: 10px;">
-                Connecting<span class="connecting-dots"><span>.</span><span>.</span><span>.</span></span>
-            </div>
-            <div style="font-size: 1rem; color: rgba(255,255,255,0.7);">Waiting for user to reconnect</div>
         </div>
 
         <!-- Call Info (Timer & Status) -->
