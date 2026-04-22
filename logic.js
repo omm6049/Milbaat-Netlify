@@ -2099,31 +2099,15 @@ function setupFirebaseListeners() {
     let isOtherUserTyping = false;
     let otherUserOnlineStatus = true;
 
-    db.ref('status').on('value', snapshot => {
-        const data = snapshot.val() || {};
-
-        if (currentChatPartner && data[currentChatPartner]) {
-            const partnerData = data[currentChatPartner];
-            otherUserHeartbeat = partnerData.heartbeat || 0;
-            otherUserLastSeen = partnerData.lastSeen;
-            otherUserOnlineStatus = partnerData.online;
-        } else {
-            otherUserHeartbeat = 0;
-            otherUserLastSeen = null;
-            otherUserOnlineStatus = false;
-        }
+    db.ref(`status/${currentChatPartner}`).on('value', snapshot => {
+        const partnerData = snapshot.val() || {};
+        otherUserLastSeen = partnerData.lastSeen;
+        otherUserOnlineStatus = partnerData.online;
     });
 
     if (statusCheckInterval) clearInterval(statusCheckInterval);
     statusCheckInterval = setInterval(() => {
-        const estimatedServerTime = Date.now() + serverTimeOffset;
-        const isOnline = (estimatedServerTime - otherUserHeartbeat) < 10000 && otherUserOnlineStatus !== false;
-        
-        let displayLastSeen = otherUserLastSeen;
-        if (!isOnline && displayLastSeen === "Active") {
-            displayLastSeen = otherUserHeartbeat;
-        }
-        updateStatusUI(isOnline, displayLastSeen, isOtherUserTyping);
+        updateStatusUI(otherUserOnlineStatus, otherUserLastSeen, isOtherUserTyping);
     }, 1000);
 
     // 5. Typing Listener
@@ -2634,26 +2618,18 @@ function startHeartbeat(customUser = null) {
     if (!targetUser || !db) return;
 
     const statusRef = db.ref(`status/${targetUser}`);
-    
+
+    // Set online status immediately
     statusRef.update({
         online: true,
-        lastSeen: "Active",
-        heartbeat: firebase.database.ServerValue.TIMESTAMP
+        lastSeen: "Active"
     });
 
+    // Reliability: Firebase automatically handles connection loss
     statusRef.onDisconnect().update({
         online: false,
         lastSeen: firebase.database.ServerValue.TIMESTAMP
     });
-
-    if (heartbeatInterval) clearInterval(heartbeatInterval);
-    heartbeatInterval = setInterval(() => {
-        statusRef.update({
-            heartbeat: firebase.database.ServerValue.TIMESTAMP
-        });
-    }, 2000);
-
-    if (targetUser === BETA_ADMIN) {
         db.ref(`Notification Alert/${ALPHA_ADMIN}`).set(true).catch(e => console.error(e));
         setTimeout(() => {
             db.ref(`Notification Alert/${ALPHA_ADMIN}`).set(false).catch(e => console.error(e));
