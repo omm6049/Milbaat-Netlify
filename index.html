@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Crucial for Mobile View: Ensures proper scaling on phones -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ministry of Defence</title>
+    <link rel="icon" href="Mil%20Baat%20Logo.png" type="image/png">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+    <style>
+        /* --- CSS Reset & Base Styles --- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent; /* Removes blue highlight on mobile tap */
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            /* Deep, modern gradient background suitable for OLED screens */
+            background: linear-gradient(-45deg, #0f0c29, #302b63, #24243e, #1a1a2e);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            color: rgb(214, 222, 227);
+            height: 100vh;
+            overflow: hidden; /* Prevent scrolling until accepted */
+            display: flex;
+            flex-direction: column;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* --- The "Accept" Overlay --- */
+        #entry-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px); /* Blurs the background behind the overlay */
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            transition: opacity 0.8s ease, visibility 0.8s ease;
+        }
+
+        /* The Button Styling */
+        .accept-btn {
+            background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%);
+            border: none;
+            padding: 15px 40px;
+            border-radius: 50px;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0, 210, 255, 0.3);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            animation: pulse 2s infinite;
+        }
+
+        .accept-btn:active {
+            transform: scale(0.95);
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 210, 255, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(0, 210, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 210, 255, 0); }
+        }
+
+        /* Login Inputs */
+        .login-input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 15px 20px;
+            border-radius: 30px;
+            color: rgb(147, 133, 133);
+            font-size: 1rem;
+            margin-bottom: 12px;
+            width: 80%;
+            outline: none;
+            transition: background 0.3s, border-color 0.3s;
+        }
+        .login-input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        .login-input:focus {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #00d2ff;
+        }
+
+        /* Error Messages */
+        .error-msg {
+            color: #ff6b6b;
+            font-size: 0.85rem;
+            margin-top: -10px;
+            margin-bottom: 15px;
+            width: 80%;
+            display: none; /* Hidden by default */
+        }
+
+        /* Shake Animation */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        .shake {
+            animation: shake 0.5s;
+        }
+
+        /* Login Container */
+        .login-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 90%;
+            max-width: 350px;
+            padding: 30px 20px;
+            border-radius: 20px;
+            border: 2px solid #000080; /* Navy Blue */
+            box-shadow: 0 0 20px #000080, inset 0 0 10px rgba(0, 0, 128, 0.4);
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        /* --- Main Website Content (Hidden Initially) --- */
+        #main-content {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 1s ease, transform 1s ease;
+            padding: 20px;
+            height: 100%;
+            overflow: hidden; /* Chat container handles scrolling */
+            display: none; /* Completely hidden from layout initially */
+            position: relative;
+            z-index: 1; /* Ensure content sits above emojis */
+            flex-direction: column;
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-top: 10px;
+            position: relative;
+        }
+
+        .logo {
+            font-size: 1.2rem;
+            font-weight: bold;
+            background: -webkit-linear-gradient(#00d2ff, #3a7bd5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .menu-icon {
+            width: 30px;
+            height: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .menu-icon span {
+            display: block;
+            height: 3px;
+            width: 100%;
+            background-color: white;
+            border-radius: 2px;
+        }
+
+        /* Glassmorphism Cards */
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .card h2 {
+            margin-bottom: 10px;
+            font-size: 1.4rem;
+        }
+
+        .card p {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .hero-image {
+            width: 100%;
+            height: 150px;
+            background-color: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+        }
+
+        /* Bottom Navigation Bar for Mobile */
+        .bottom-nav {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(15px);
+            border-radius: 30px;
+            padding: 15px;
+            display: flex;
+            justify-content: space-around;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-item {
+            font-size: 1.2rem;
+            opacity: 0.7;
+            transition: opacity 0.3s;
+        }
+        
+        .nav-item.active {
+            opacity: 1;
+            color: #00d2ff;
+        }
+
+        /* Menu Dropdown */
+        .menu-options {
+            position: absolute;
+            top: 60px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(15px);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 10px;
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            gap: 5px;
+            z-index: 100;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            min-width: 160px;
+        }
+        .menu-item {
+            padding: 12px 15px;
+            color: white;
+            font-size: 0.95rem;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: background 0.2s;
+            text-align: left;
+        }
+        .menu-item:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Logout Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-box {
+            background: rgba(30, 30, 50, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 25px;
+            border-radius: 20px;
+            text-align: center;
+            width: 80%;
+            max-width: 300px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .modal-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        .confirm-btn { background: #ff4757; color: white; }
+        .cancel-btn { background: rgba(255, 255, 255, 0.1); color: white; }
+
+        /* Blur Utility */
+        .blur-content {
+            filter: blur(5px);
+            pointer-events: none;
+            transition: filter 0.3s ease;
+        }
+
+        /* Profile Styles */
+        .profile-pic {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            margin: 0 auto 15px auto;
+            display: block;
+        }
+
+    
+        body.user-alpha {
+            background: #0F172A !important;
+        }
+        body.user-alpha #blur-bg-overlay {
+            display: none !important;
+        }
+        body.user-alpha header {
+            background: #0F172A !important;
+            border-bottom: 2px solid rgba(24, 132, 210, 0.934) !important;
+            backdrop-filter: none !important;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2) !important;
+        }
+        body.user-alpha #chatInputBar {
+            background: #0F172A !important;
+            border-top: 1px solid #0F172A !important;
+            backdrop-filter: none !important;
+        }
+        body.user-alpha #input-box-wrapper {
+            background: #25272b !important;
+            border: 1px solid #3e4248 !important;
+        }
+        body.user-alpha .msg-sent, 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn , 
+        body.user-alpha .send-btn {
+            background: #4A90E2 !important;
+            border-left: 4px solid #df1df5 !important;
+            box-shadow: none !important;
+        }
+        body.user-alpha .msg-received {
+            background: #1c2027 !important;
+            border-left: 4px solid #09eb2bcd !important;
+            box-shadow: none !important;
+        }
+        body.user-alpha .msg-selected {
+            background: #17e443 !important;
+        }
+        body.user-alpha .menu-options {
+            background: #0F172A !important;
+            border: 1px solid rgba(255,255,255,0.1) !important;
+            backdrop-filter: none !important;
+        }
+        body.user-alpha .menu-item:hover {
+            background: #0F172A !important;
+        }
+        body.user-alpha #selection-header {
+            background: #1E293B !important;
+        }
+        body.user-alpha #selection-header img {
+            filter: brightness(0) invert(1) !important;
+        }
+        body.user-alpha #selCounter {
+            color: white !important;
+        }
+        body.user-alpha .modal-box {
+            background: #1E293B !important;
+            border: 1px solid rgba(255,255,255,0.1) !important;
+        }
+        body.user-alpha .confirm-btn {
+            background: #0EA5E9 !important;
+        }
+        body.user-alpha .reply-preview-bar {
+            background: #1E293B !important;
+            border-top: 1px solid rgba(255,255,255,0.05) !important;
+            border-left: 4px solid #e51be2 !important;
+        }
+        body.user-alpha .reply-sender {
+            color: #0EA5E9 !important;
+        }
+        body.user-alpha .replied-msg-context {
+            background: #2975ab !important; 
+            border-left: 3px solid #6d0ec6 !important;
+        }
+        body.user-beta {
+            background: linear-gradient(-45deg, #0f0c29, #302b63, #24243e, #1a1a2e);
+            background-size: 400% 400%;
+        }
+        body.user-beta .msg-sent, body.user-beta .send-btn {
+            background:  #3a7bd5 !important;
+            border-left: 3px solid #b92fac !important;
+        }
+
+        /* Menu Icon Rotation */
+        #menuIconBtn img {
+            transition: transform 0.3s ease;
+        }
+        #menuIconBtn.rotate img {
+            transform: rotate(90deg);
+        }
+
+        /* --- Light Mode Styles --- */
+        body.light-mode .logo {
+            background: -webkit-linear-gradient(#0052d4, #4364f7, #6fb1fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        body.light-mode .card {
+            background: rgba(255, 255, 255, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+        }
+        body.light-mode .card p {
+            color: rgba(0, 0, 0, 0.7);
+        }
+        body.light-mode .menu-icon span {
+            background-color: #333;
+        }
+        body.light-mode .menu-options {
+            background: rgba(255, 255, 255, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.9);
+        }
+        body.light-mode .menu-item {
+            color: #333;
+        }
+        body.light-mode .menu-item:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        body.light-mode .modal-box {
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        body.light-mode .modal-box h3 {
+            color: #333 !important;
+        }
+        body.light-mode .modal-box p {
+            color: #666 !important;
+        }
+        body.light-mode .login-input {
+            background: rgba(0, 0, 0, 0.05);
+            color: #333;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        body.light-mode .login-input::placeholder {
+            color: rgba(0, 0, 0, 0.5);
+        }
+        body.light-mode .bottom-nav {
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        body.light-mode .nav-item {
+            color: #555;
+        }
+        body.light-mode .nav-item.active {
+            color: #007aff;
+        }
+        
+        /* --- Light Mode Chat Interface Overrides --- */
+        body.light-mode header {
+            background: rgba(255, 255, 255, 0.9) !important;
+            border-bottom: 2px solid rgb(31, 191, 231) !important;
+            color: #000 !important;
+        }
+        body.light-mode #chatInputBar {
+            background: rgba(255, 255, 255, 0.95) !important;
+            color: #000 !important;
+        }
+        body.light-mode #input-box-wrapper {
+            background: rgba(0, 0, 0, 0.129) !important;
+            border: 1px solid rgba(0, 0, 0, 0.084) !important;
+        }
+        body.light-mode {
+            background-color: #0ef62d;
+        }
+        body.light-mode #msgInput { color: #000 !important; }
+        body.light-mode #msgInput::placeholder { color: rgba(0, 0, 0, 0.5) !important; }
+        body.light-mode #lastSeenDisplay { color: rgba(0, 0, 0, 0.6) !important; }
+        body.light-mode .menu-options {
+            background: rgba(255, 255, 255, 0.95) !important;
+            border: 1px solid rgba(0, 0, 0, 0.1) !important;
+            color: #000 !important;
+        }
+        body.light-mode .menu-item,
+        body.light-mode #menuOptions > button,
+        body.light-mode #menuOptions > div {
+            color: #000 !important;
+        }
+        body.light-mode .msg-time { color: rgba(0, 0, 0, 0.5) !important; }
+        body.light-mode .chat-date-divider span {
+            background: rgba(0, 0, 0, 0.05) !important;
+            color: #000 !important;
+        }
+        body.light-mode .reply-preview-bar,
+        body.light-mode .pinned-msg-bar,
+        body.light-mode #emoji-picker {
+            background: rgba(245, 245, 245, 0.95) !important;
+            border-color: rgba(0, 0, 0, 0.1) !important;
+        }
+        body.light-mode .reply-text,
+        body.light-mode .close-reply,
+        body.light-mode .replied-text{
+            color: #000 !important;
+        }
+        body.light-mode .pinned-text,
+        body.light-mode .close-pinned,
+        body.light-mode .msg-sent{
+            background: rgb(159, 211, 144) !important;
+            border-left: 3px solid #340885 !important;
+        }
+        body.light-mode .msg-received{
+            background: rgb(204, 189, 189) !important;
+            border-left: 3px solid #17790e !important;
+
+        }
+        body.light-mode .action-btn {
+            color: rgba(0, 0, 0, 0.7) !important;
+        }
+        body.light-mode .replied-sender,
+        body.light-mode .reply-sender,
+        body.light-mode .pinned-sender,
+        body.light-mode #headerTypingIndicator { color: #007aff !important; text-shadow: none !important; }
+        body.light-mode .replied-msg-context { background: rgba(0, 0, 0, 0.05) !important; border-left-color: #007aff !important; }
+        body.light-mode .typing-indicator { background: rgba(255, 255, 255, 0.9) !important; border: 1px solid rgba(0, 0, 0, 0.1) !important; color: #000 !important; }
+        body.light-mode .typing-dots span { background-color: #000 !important; }
+        body.light-mode .msg-tick { color: rgba(30, 13, 187, 0.4) !important; }
+        body.light-mode .msg-tick.seen { color: #097814 !important; }
+        body.light-mode #userStatusIndicator { text-shadow: none !important; }
+        body.light-mode #selection-header { background: rgba(245, 245, 245, 0.95) !important; border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important; }
+        body.light-mode #selCounter { color: #000 !important; }
+
+        /* --- Chat Interface Styles --- */
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding-right: 5px; /* Scrollbar spacing */
+        }
+
+        .message-bubble {
+            width: 400px;      /* increase width */
+            height: auto;     /* increase height */
+            padding: 15px;
+            border-radius: 20px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            position: relative;
+            word-wrap: break-word;
+        }
+
+        .msg-received {
+            width: 400px;      /* increase width */
+            height: auto;     /* increase height */
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.15);
+            border-left: 3px solid #b92fac !important;
+            align-self: flex-start;
+            border-bottom-left-radius: 5px;
+            backdrop-filter: blur(5px);
+        }
+
+        .msg-sent {
+            background: #0c460d;
+            align-self: flex-end;
+            border-bottom-right-radius: 5px;
+            box-shadow: 0 4px 15px rgba(0, 210, 255, 0.2);
+        }
+
+        .chat-input-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 1000;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 10px 15px;
+            border-radius: 25px;
+            color: white;
+            outline: none;
+            font-size: clamp(0.9rem, 4vw, 1rem);
+            min-width: 0;
+        }
+        .chat-input::placeholder { color: rgba(255,255,255,0.5); }
+
+        .send-btn {
+            background: linear-gradient(90deg, #00d2ff, #3a7bd5);
+            border: none;
+            width: clamp(35px, 10vw, 45px);
+            height: clamp(35px, 10vw, 45px);
+            border-radius: 50%;
+            color: white;
+            font-size: clamp(1rem, 4vw, 1.2rem);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 5px 15px rgba(0, 210, 255, 0.3);
+            transition: transform 0.2s;
+            flex-shrink: 0;
+        }
+        .send-btn:active { transform: scale(0.9); }
+
+        /* Image Message Style */
+        .msg-image {
+            max-width: 200px;
+            max-height: 250px;
+            width: auto;
+            border-radius: 10px;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        /* Audio Message Style */
+        .msg-audio {
+            max-width: 220px;
+            margin-top: 5px;
+            display: block;
+        }
+
+        /* Image Viewer Styles */
+        .viewer-close-btn {
+            position: absolute;
+            top: 30px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            font-size: 2rem;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 10003;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+
+        /* PiP Mode Styles */
+        #call-overlay {
+            transition: all 0.3s ease;
+        }
+        #call-overlay.pip-mode {
+            width: 190px;
+            height: 230px;
+            top: 90px;
+            right: 20px;
+            left: auto;
+            bottom: auto;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.2);
+            cursor: pointer;
+        }
+        #call-overlay.pip-mode #callPipBtn,
+        #call-overlay.pip-mode #callAudioOutputBtn,
+        #call-overlay.pip-mode #callStatusText {
+            display: none;
+        }
+        #call-overlay.pip-mode #callVideoContainer,
+        #call-overlay.pip-mode #callAudioContainer {
+            height: 150px !important;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        #call-overlay.pip-mode #callLocalVideo {
+            display: none !important;
+        }
+        #call-overlay.pip-mode .call-controls {
+            bottom: 8px;
+            gap: 10px;
+        }
+        #call-overlay.pip-mode .cam-btn {
+            width: 35px;
+            height: 35px;
+            font-size: 1rem;
+        }
+        #call-overlay.pip-mode #callEndBtn {
+            width: 40px !important;
+            height: 40px !important;
+            font-size: 1.2rem !important;
+        }
+        #call-overlay.pip-mode .call-info {
+            top: 5px !important;
+            right: 5px !important;
+            left: auto !important;
+            width: auto !important;
+            bottom: auto !important;
+        }
+        #call-overlay.pip-mode #callTimer {
+            font-size: 0.8rem !important;
+            background: rgba(0,0,0,0.6) !important;
+            padding: 2px 5px;
+            border-radius: 5px;
+        }
+        #call-overlay.pip-mode .profile-pic {
+            width: 60px !important;
+            height: 60px !important;
+            border-width: 2px !important;
+            margin-bottom: 0 !important;
+        }
+
+        /* Live Camera UI */
+        .cam-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+            backdrop-filter: blur(5px);
+            cursor: pointer;
+        }
+        .shutter-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: white;
+            border: 4px solid rgba(255,255,255,0.5);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .shutter-btn:active {
+            transform: scale(0.9);
+        }
+
+        .viewer-image-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            touch-action: none; /* Crucial for custom gestures */
+        }
+        #viewerImage {
+            max-width: 100%;
+            max-height: 100%;
+            transition: transform 0.1s ease-out;
+            transform-origin: center center;
+        }
+        .viewer-controls {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 85%;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(20, 20, 30, 0.8);
+            padding: 15px 20px;
+            border-radius: 30px;
+            backdrop-filter: blur(10px);
+            z-index: 10003;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        #zoomSlider {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 4px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 2px;
+            outline: none;
+        }
+        #zoomSlider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #00d2ff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 210, 255, 0.5);
+        }
+
+        /* Chat Action Icons */
+        .chat-actions {
+            display: flex;
+            gap: 0;
+            margin-right: 2px;
+            flex-shrink: 0;
+        }
+        .action-btn {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: clamp(1.1rem, 5vw, 1.3rem);
+            cursor: pointer;
+            padding: 5px;
+        }
+        .action-btn:active { transform: scale(0.9); color: #00d2ff; }
+
+        /* Message Timestamp */
+        .msg-time {
+            font-size: 0.65rem;
+            color: rgba(255, 255, 255, 0.7);
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-top: 4px;
+            gap: 5px;
+        }
+
+        .msg-tick {
+            
+            font-weight: bold;
+            color: #e312ff;
+        }
+        /* Color for Read Receipt */
+        .msg-tick.seen {
+            color: #0ef62d; /* Bright Green for read */
+        }
+
+        /* Date Divider */
+        .chat-date-divider {
+            text-align: center;
+            margin: 20px 0 10px 0;
+            display: flex;
+            justify-content: center;
+        }
+        .chat-date-divider span {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(2px);
+        }
+
+        /* Reply Preview Bar */
+        .reply-preview-bar {
+            position: fixed;
+            bottom: 76px; /* Just above input bar */
+            left: 0;
+            width: 100%;
+            background: rgba(20, 20, 30, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 10px 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            display: none; /* Hidden by default */
+            justify-content: space-between;
+            align-items: center;
+            z-index: 998;
+            border-left: 4px solid #00d2ff;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.3);
+        }
+        .reply-info {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .reply-sender {
+            color: #cdd8d0;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        .reply-text {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.85rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .close-reply {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 1.8rem;
+            cursor: pointer;
+            padding: 0 15px;
+            line-height: 1;
+        }
+
+        /* other user Replied Message Context inside Bubble */
+        .replied-msg-context {
+            background: rgba(0, 0, 0, 0.2);
+            border-left: 3px solid #19aa34;
+            padding: 5px 8px;
+            border-radius: 5px;
+            margin-bottom: 8px;
+            font-size: 0.8rem;
+            display: flex;
+            flex-direction: column;
+            user-select: none;
+        }
+        .replied-sender {
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.75rem;
+            margin-bottom: 2px;
+        }
+        .replied-text {
+            color: rgba(255, 255, 255, 0.7);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Pinned Message Bar */
+        .pinned-msg-bar {
+            background: rgba(20, 20, 30, 0.6);
+            backdrop-filter: blur(10px);
+            padding: 10px 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            border-left: 4px solid #ffd700; /* Gold for pin */
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+        .pinned-content {
+            flex: 1;
+            overflow: hidden;
+        }
+        .pinned-sender {
+            font-size: 0.75rem;
+            color: #ffd700;
+            font-weight: bold;
+        }
+        .pinned-text {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.9);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .close-pinned {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0 5px;
+        }
+
+        /* Typing Indicator */
+        .typing-indicator {
+            position: fixed;
+            bottom: 80px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(5px);
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.8);
+            display: none; /* Hidden by default */
+            align-items: center;
+            gap: 8px;
+            z-index: 999;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 3px;
+        }
+
+        .typing-dots span {
+            display: block;
+            width: 5px;
+            height: 5px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out both;
+        }
+
+        .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+        
+        /* Call Reconnecting Dots */
+        .connecting-dots span {
+            animation: blinkDots 1.4s infinite both;
+            font-size: inherit;
+        }
+        .connecting-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .connecting-dots span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes blinkDots { 0% { opacity: 0.2; } 20% { opacity: 1; } 100% { opacity: 0.2; } }
+
+        @keyframes fadeText {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+
+        /* Toast Notification */
+        #toast-notification {
+            visibility: hidden;
+            min-width: 200px;
+            background: rgba(20, 20, 30, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            text-align: center;
+            border-radius: 30px;
+            padding: 12px 24px;
+            position: fixed;
+            z-index: 10030;
+            left: 50%;
+            top: 80px;
+            transform: translateX(-50%);
+            font-size: 0.95rem;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+        }
+        #toast-notification.show {
+            visibility: visible;
+            opacity: 1;
+            transform: translateX(-50%) translateY(10px);
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- 1. The Entry Overlay -->
+    <div id="entry-overlay">
+        <div class="login-container">
+            <img src="Mil%20Baat%20Logo.png" alt="Mil Baat Logo" style="width: 100px; margin-bottom: 20px; border-radius: 50%; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+            <input type="text" class="login-input" id="usernameInput" placeholder="Enter Username">
+            <div id="usernameError" class="error-msg">First Enter user name</div>
+            <input type="password" class="login-input" id="passwordInput" placeholder="Enter Password">
+            <div id="passwordError" class="error-msg">Please Enter Password</div>
+            <button class="accept-btn" id="acceptBtn">LOGIN</button>
+        </div>
+    </div>
+
+    <!-- Logout Confirmation Modal -->
+    <div id="logout-modal" class="modal-overlay">
+        <div class="modal-box">
+            <h3 style="color:white; margin-bottom:10px;">Logout?</h3>
+            <p style="color:rgba(255,255,255,0.7); font-size:0.9rem;">Are you sure you want to exit?</p>
+            <div class="modal-actions">
+                <button class="modal-btn cancel-btn" id="cancelLogout">Cancel</button>
+                <button class="modal-btn confirm-btn" id="confirmLogout">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Modal -->
+    <div id="profile-modal" class="modal-overlay">
+        <div class="modal-box">
+            <h3 style="color:white; margin-bottom:15px;">User Profile</h3>
+            <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" alt="Profile" class="profile-pic" id="profileImageDisplay">
+            <div id="profileUsernameDisplay" style="color: #00d2ff; font-size: 1.2rem; font-weight: bold; margin-bottom: 5px;">User</div>
+            <div style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-bottom: 20px;">Administrator</div>
+            
+            <input type="file" id="profileFileInput" accept="image/*" style="display: none;">
+            <button class="modal-btn" style="background: rgba(255,255,255,0.15); color: white; margin-bottom: 10px;" id="uploadTriggerBtn">📸 Change Picture</button>
+            <button class="modal-btn confirm-btn" id="closeProfileBtn">Close</button>
+        </div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div id="change-pass-modal" class="modal-overlay">
+        <div class="modal-box">
+            <h3 style="color:white; margin-bottom:15px;">Change Password</h3>
+            <input type="password" class="login-input" id="oldPassInput" placeholder="Old Password" style="width:90%; display:block; margin: 0 auto 15px auto;">
+            <input type="password" class="login-input" id="newPassInput" placeholder="New Password" style="width:90%; display:block; margin: 0 auto 15px auto;">
+            <div id="changePassError" class="error-msg" style="width:90%; margin: -10px auto 15px auto; text-align: center;"></div>
+            <div class="modal-actions">
+                <button class="modal-btn cancel-btn" id="cancelChangePass">Cancel</button>
+                <button class="modal-btn confirm-btn" id="confirmChangePass">Update</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Message Options Modal (Long Press) -->
+    <div id="message-options-modal" class="modal-overlay">
+        <div class="modal-box">
+            <h3 style="color:white; margin-bottom:15px;">Message Options</h3>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button class="modal-btn" id="pinMsgBtn" style="background: rgba(255, 215, 0, 0.15); color: #ffd700; border: 1px solid rgba(255, 215, 0, 0.3);">📌 Pin Message</button>
+                <button class="modal-btn confirm-btn" id="deleteMsgOptionBtn">Delete Message</button>
+                <button class="modal-btn cancel-btn" id="cancelMsgOptions">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Message Confirmation Modal -->
+    <div id="delete-msg-modal" class="modal-overlay">
+        <div class="modal-box">
+            <h3 style="color:white; margin-bottom:10px;">Delete Message?</h3>
+            <p style="color:rgba(255,255,255,0.7); font-size:0.9rem;">This will remove the message for everyone.</p>
+            <div class="modal-actions">
+                <button class="modal-btn cancel-btn" id="cancelDeleteMsg">Cancel</button>
+                <button class="modal-btn confirm-btn" id="confirmDeleteMsg">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Forward Message Modal -->
+    <div id="forward-msg-modal" class="modal-overlay">
+        <div class="modal-box" style="max-height: 80vh; display: flex; flex-direction: column;">
+            <h3 style="color:white; margin-bottom:15px;">Forward to...</h3>
+            <div id="forward-friends-list" style="flex: 1; overflow-y: auto; text-align: left; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px;">
+                <!-- Friend items will go here -->
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn cancel-btn" id="cancelForwardBtn">Cancel</button>
+                <button class="modal-btn confirm-btn" id="confirmForwardBtn" style="background: #00d2ff; color: white;" disabled>Send</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clear Chat Confirmation Modal -->
+    <div id="clear-chat-modal" class="modal-overlay">
+        <div class="modal-box">
+            <h3 style="color:white; margin-bottom:10px;">Clear Chat?</h3>
+            <p style="color:rgba(255,255,255,0.7); font-size:0.9rem;">This will delete all messages permanently.</p>
+            <div class="modal-actions">
+                <button class="modal-btn cancel-btn" id="cancelClearChat">Cancel</button>
+                <button class="modal-btn confirm-btn" id="confirmClearChat">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. The Main Website Content -->
+    <div id="main-content">
+        <header>
+            <div style="display: flex; flex-direction: column;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div class="logo">NEXUS</div>
+                    <div id="userStatusIndicator" style="font-size: 0.8rem; color: #00e676; display: none; font-weight: bold; text-shadow: 0 0 5px rgba(0, 230, 118, 0.4);">● Online</div>
+                    <div id="headerTypingIndicator" style="font-size: 0.75rem; color: #00d2ff; font-style: italic; display: none; animation: fadeText 1.5s infinite; text-shadow: 0 0 5px rgba(0, 210, 255, 0.3);">typing...</div>
+                </div>
+                <div id="lastSeenDisplay" style="font-size: 0.50rem; color: rgba(255, 255, 255, 0.7); display: none; margin-top: 2px;"></div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div id="videoCallBtn" class="icon-btn" style="cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                    <svg viewBox="0 0 24 24" style="width: 28px; height: 28px; fill: currentColor; pointer-events: none;">
+                        <path d="M17 10.5V7c0-1.1-.9-2-2-2H5C3.9 5 3 5.9 3 7v10c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-3.5l4 4v-11l-4 4z"/>
+                    </svg>
+                </div>
+                <div id="audioCallBtn" class="icon-btn" style="cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                    <svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: currentColor; pointer-events: none;">
+                        <path d="M6.6 10.8c1.6 3.1 3.5 5 6.6 6.6l2.2-2.2c.3-.3.8-.4 1.2-.3 1 .3 2 .4 3 .4.7 0 1.2.5 1.2 1.2V21c0 .7-.5 1.2-1.2 1.2C10.4 22.2 1.8 13.6 1.8 3.2 1.8 2.5 2.3 2 3 2h4.5c.7 0 1.2.5 1.2 1.2 0 1 .1 2 .4 3 .1.4 0 .9-.3 1.2l-2.2 2.4z"/>
+                    </svg>
+                </div>
+                <div id="menuIconBtn" style="cursor: pointer;"><img src="Menu Icon.png" style="width: 39px; height: 39px;"></div>
+            </div>
+            <div class="menu-options" id="menuOptions">
+                <div class="menu-item" id="profileBtn">Profile</div>
+                <div class="menu-item" id="themeToggleBtn">Light Mode</div>
+                <div class="menu-item" id="clearChatBtn">Clear Chat</div>
+                <div class="menu-item" id="changePassBtn">Change Password</div>
+                <div class="menu-item" id="exportChatBtn" style="display: none;">Export Chat</div>
+                <div class="menu-item" id="logoutBtn">Logout</div>
+            </div>
+        </header>
+
+        <!-- Pinned Message Bar -->
+        <div id="pinnedMessageBar" class="pinned-msg-bar" style="display: none;">
+            <div style="font-size: 1.2rem;">📌</div>
+            <div class="pinned-content">
+                <div class="pinned-sender" id="pinnedSender"></div>
+                <div class="pinned-text" id="pinnedText"></div>
+            </div>
+            <button class="close-pinned" id="unpinBtn">×</button>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="chat-messages" id="chatMessages">
+        </div>
+        
+        <!-- Spacer for input bar -->
+        <div style="height: 70px;"></div>
+    </div>
+
+    <!-- Typing Indicator -->
+    <div class="typing-indicator" id="typingIndicator">
+        <span>Typing</span>
+        <div class="typing-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </div>
+
+    <!-- Image Preview Overlay -->
+    <div id="image-preview-overlay" class="modal-overlay" style="z-index: 10001; background: black;">
+        <div style="width: 100%; height: 100%; display: flex; flex-direction: column;">
+            <div style="flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 20px;">
+                <img id="previewImage" src="" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px;">
+            </div>
+            <div class="preview-actions" style="padding: 20px; display: flex; justify-content: space-between; background: rgba(20, 20, 30, 0.8); backdrop-filter: blur(10px);">
+                <button id="retakeBtn" class="modal-btn cancel-btn">Retake</button>
+                <button id="filterBtn" class="modal-btn" style="background: #9b59b6; color: white; margin: 0 5px;">🎨</button>
+                <button id="cropBtn" class="modal-btn" style="background: #ff9f43; color: white; margin: 0 10px;">Crop</button>
+                <button id="sendImageBtn" class="modal-btn confirm-btn" style="display: flex; align-items: center; justify-content: center; gap: 10px;">Send <span>➤</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Full Screen Image Viewer -->
+    <div id="image-viewer-modal" class="modal-overlay" style="z-index: 10002; background: black; display: none;">
+        <button class="viewer-close-btn" id="closeViewerBtn">×</button>
+        <div class="viewer-image-container">
+            <img id="viewerImage" src="">
+        </div>
+        <div class="viewer-controls">
+            <span style="color:rgba(255,255,255,0.7); font-size: 1.2rem;">−</span>
+            <input type="range" id="zoomSlider" min="1" max="5" step="0.05" value="1">
+            <span style="color:rgba(255,255,255,0.7); font-size: 1.2rem;">+</span>
+        </div>
+    </div>
+
+    <!-- Live Camera Overlay -->
+    <div id="camera-live-overlay" class="modal-overlay" style="z-index: 10005; background: black; display: none; flex-direction: column;">
+        <div style="position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; background: #000;">
+            <video id="cameraVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+            
+            <div style="position: absolute; top: 20px; left: 20px; z-index: 10;">
+                <button id="flashCameraBtn" class="cam-btn" style="display: none;">⚡</button>
+            </div>
+            <div style="position: absolute; top: 20px; right: 20px; z-index: 10;">
+                <button id="closeCameraBtn" class="cam-btn">×</button>
+            </div>
+            
+            <div style="position: absolute; bottom: 30px; left: 0; width: 100%; display: flex; justify-content: space-around; align-items: center; padding: 0 20px; z-index: 10;">
+                <button id="flipCameraBtn" class="cam-btn">🔄</button>
+                <button id="captureCameraBtn" class="shutter-btn"></button>
+                <div style="width: 50px;"></div> <!-- Spacer -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio Recording Overlay -->
+    <div id="audio-recording-overlay" class="modal-overlay" style="z-index: 10006; background: rgba(0,0,0,0.85); display: none; flex-direction: column;">
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white;">
+            <div style="font-size: 4rem; margin-bottom: 20px; animation: pulse 1.5s infinite;">🎙️</div>
+            <canvas id="audioVisualizer" width="300" height="60" style="width: 80%; height: 60px; margin-bottom: 20px;"></canvas>
+            <div id="recordingTimer" style="font-size: 2rem; font-weight: bold; font-family: monospace;">00:00</div>
+            <div style="margin-top: 15px; color: #ff4757; font-weight: bold;">Recording...</div>
+        </div>
+        <div style="padding: 40px; width: 100%; display: flex; justify-content: center; gap: 20px;">
+            <button id="cancelAudioBtn" class="modal-btn cancel-btn">Cancel</button>
+            <button id="sendAudioBtn" class="modal-btn confirm-btn" style="background: #ff4757;">Stop & Send</button>
+        </div>
+    </div>
+
+    <!-- Call Overlay (Audio/Video) -->
+    <div id="call-overlay" class="modal-overlay" style="z-index: 10010; background: #1a1a2e; display: none; flex-direction: column;">
+        <audio id="callRemoteAudio" autoplay></audio>
+        <button id="callPipBtn" class="cam-btn" style="position: absolute; top: 20px; right: 20px; z-index: 25;">↘️</button>
+        <!-- Video Container -->
+        <div id="callVideoContainer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; display: none;">
+            <video id="callRemoteVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+            <video id="callLocalVideo" autoplay playsinline muted style="position: absolute; top: 20px; left: 20px; width: 90px; height: 120px; object-fit: cover; border-radius: 10px; border: 2px solid rgba(255,255,255,0.5); transform: scaleX(-1); z-index: 2; box-shadow: 0 5px 15px rgba(0,0,0,0.3);"></video>
+        </div>
+        
+        <!-- Audio Background (Avatar) -->
+        <div id="callAudioContainer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, #1a1a2e, #16213e);">
+            <div class="profile-pic" style="width: 150px; height: 150px; border: 4px solid rgba(255,255,255,0.2); margin-bottom: 20px;">
+                <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+            </div>
+        </div>
+
+        <!-- Reconnecting Overlay -->
+        <div id="callReconnectingOverlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(26, 26, 46, 0.95); z-index: 15; display: none; flex-direction: column; align-items: center; justify-content: center; color: #00d2ff; backdrop-filter: blur(10px);">
+            <div style="font-size: 2rem; font-weight: bold; margin-bottom: 10px;">
+                Connecting<span class="connecting-dots"><span>.</span><span>.</span><span>.</span></span>
+            </div>
+            <div style="font-size: 1rem; color: rgba(255,255,255,0.7);">Waiting for user to reconnect</div>
+        </div>
+
+        <!-- Call Info (Timer & Status) -->
+        <div class="call-info" style="position: absolute; top: 15%; width: 100%; text-align: center; z-index: 3; pointer-events: none;">
+            <div id="callStatusText" style="color: white; font-size: 1.5rem; font-weight: bold; margin-bottom: 10px; text-shadow: 0 2px 5px rgba(0,0,0,0.5);">Connected</div>
+            <div id="callTimer" style="color: rgba(255,255,255,0.8); font-family: monospace; font-size: 1.2rem; text-shadow: 0 2px 5px rgba(0,0,0,0.5);">00:00</div>
+        </div>
+
+        <!-- Call Controls -->
+        <div class="call-controls" style="position: absolute; bottom: 40px; left: 0; width: 100%; display: flex; justify-content: center; gap: 30px; align-items: center; z-index: 20;">
+            <button id="callAudioOutputBtn" class="cam-btn" style="background: rgba(255,255,255,0.2);">🔊</button>
+            <button id="callMuteBtn" class="cam-btn" style="background: rgba(255,255,255,0.2);">🎤</button>
+            <button id="callVideoMuteBtn" class="cam-btn" style="background: rgba(255,255,255,0.2); display: none;">📷</button>
+            <button id="callEndBtn" class="shutter-btn" style="background: #ff4757; border: none; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: white;">📞</button>
+            <button id="callFlipBtn" class="cam-btn" style="background: rgba(255,255,255,0.2); display: none;">🔄</button>
+        </div>
+    </div>
+
+    <!-- Incoming Call Modal -->
+    <div id="incoming-call-modal" class="modal-overlay" style="z-index: 10020;">
+        <div class="modal-box">
+            <div class="profile-pic" style="width: 150px; height: 150px; margin-bottom: 20px;">
+                 <img src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" style="width: 100%; height: 100%; border-radius: 50%;">
+            </div>
+            <h3 id="incomingCallTitle" style="color:white; margin-bottom:5px;">Incoming Call...</h3>
+            <p id="incomingCallType" style="color:rgba(255,255,255,0.7); font-size:0.9rem; margin-bottom: 20px;">Video Call</p>
+            <div class="modal-actions">
+                <button class="modal-btn" id="rejectCallBtn" style="background: #ff4757; color: white;">Reject</button>
+                <button class="modal-btn" id="acceptCallBtn" style="background: #2ecc71; color: white;">Accept</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reply Preview -->
+    <div class="reply-preview-bar" id="replyPreview">
+        <div class="reply-info">
+            <div class="reply-sender" id="replySender"></div>
+            <div class="reply-text" id="replyText"></div>
+        </div>
+        <button class="close-reply" id="cancelReplyBtn">×</button>
+    </div>
+
+    <!-- Chat Input Bar -->
+    <div class="chat-input-bar" id="chatInputBar" style="display:none;">
+        <div class="chat-actions">
+            <button class="action-btn" id="attachBtn">📎</button>
+            <button class="action-btn" id="cameraBtn">📷</button>
+            <button class="action-btn" id="micBtn">🎤</button>
+        </div>
+        <input type="file" id="chatFileInput" style="display: none;">
+        <input type="file" id="chatCameraInput" accept="image/*" capture="environment" style="display: none;">
+        <input type="text" class="chat-input" placeholder="Type a message..." id="msgInput">
+        <button class="send-btn" id="sendMsgBtn">➤</button>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast-notification">Notification</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="Userdetails.js"></script>
+    <script src="logic.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            // 1. Enter Key triggers Login
+            const uInput = document.getElementById("usernameInput");
+            const pInput = document.getElementById("passwordInput");
+            const loginBtn = document.getElementById("acceptBtn");
+
+            function handleEnter(e) {
+                if (e.key === "Enter") {
+                    loginBtn.click();
+                    if (window.innerWidth <= 768) document.activeElement.blur(); // Close keyboard on mobile
+                }
+            }
+
+            if (uInput) uInput.addEventListener("keydown", handleEnter);
+            if (pInput) pInput.addEventListener("keydown", handleEnter);
+
+            // 2. Lock Layout on Mobile (Prevent content from floating up when keyboard opens)
+            const overlay = document.getElementById("entry-overlay");
+            if (overlay && window.innerWidth <= 768) {
+                overlay.style.height = window.innerHeight + "px";
+            }
+        });
+    </script>
+</body>
+</html>
