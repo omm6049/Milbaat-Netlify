@@ -1109,13 +1109,13 @@
                 </div>
                 
                 <!-- Scanner Container -->
-                <div style="width: 180px; height: 180px; border-radius: 50%; overflow: hidden; border: 3px solid #00d2ff; margin-bottom: 15px; position: relative; background: #000;">
+                <div id="faceScanContainer" style="width: 180px; height: 180px; border-radius: 50%; overflow: hidden; border: 4px solid #ff4757; margin-bottom: 15px; position: relative; background: #000; transition: border-color 0.3s ease;">
                     <video id="faceScanVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
                     <div id="faceScanLine" style="position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: #00ff00; box-shadow: 0 0 10px #00ff00; animation: scanMove 2s infinite linear;"></div>
                 </div>
                 
                 <div id="faceScanPercentage" style="font-size: 1.3rem; font-weight: bold; color: #00d2ff; margin-bottom: 3px;">0%</div>
-                <div id="faceScanStatus" style="color: #00d2ff; margin-bottom: 15px; font-size: 0.8rem; font-weight: 500;">Ready to scan</div>
+                <div id="faceScanStatus" style="color: #ff4757; margin-bottom: 15px; font-size: 0.8rem; font-weight: 500;">Position face in frame</div>
 
                 <button class="accept-btn" id="faceCaptureBtn" style="width: 100%; display: none; margin-bottom: 15px;">Submit</button>
 

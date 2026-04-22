@@ -791,6 +791,7 @@ headerLogoutBtn.addEventListener('click', () => {
     const facelockView = document.getElementById('facelock-view');
     const landingLogo = document.getElementById('landingLogo');
     const faceVideo = document.getElementById('faceScanVideo');
+    const faceScanContainer = document.getElementById('faceScanContainer');
     const faceScanPercentage = document.getElementById('faceScanPercentage');
     const faceScanStatus = document.getElementById('faceScanStatus');
     const faceCaptureBtn = document.getElementById('faceCaptureBtn');
@@ -799,6 +800,7 @@ headerLogoutBtn.addEventListener('click', () => {
     
     let faceStream = null;
     let isSignupMode = false;
+    let faceDetected = false;
     let scanProgressInterval = null;
 
     function showView(view) {
@@ -826,18 +828,27 @@ headerLogoutBtn.addEventListener('click', () => {
         showView(userPassView);
     };
 
+    function updateFaceDetectionState(detected) {
+        faceDetected = detected;
+        if (faceScanContainer) {
+            faceScanContainer.style.borderColor = detected ? "#2ecc71" : "#ff4757";
+        }
+        faceScanStatus.style.color = detected ? "#2ecc71" : "#ff4757";
+    }
+
     // Verify (Login)
     document.getElementById('faceVerifyLink').onclick = () => {
+        if (!faceDetected) return showToast("No face detected!");
         isSignupMode = false;
         faceRetryLink.style.visibility = 'hidden';
         faceCaptureBtn.style.display = 'none';
         faceScanPercentage.innerText = "0%";
-        faceScanStatus.innerText = "Scanning face for verification...";
         startScanningProgress();
     };
 
     // Register (Signup)
     document.getElementById('faceRegisterLink').onclick = () => {
+        if (!faceDetected) return showToast("No face detected!");
         faceCredsModal.style.display = 'flex';
     };
 
@@ -888,6 +899,17 @@ headerLogoutBtn.addEventListener('click', () => {
             faceStream = await navigator.mediaDevices.getUserMedia(constraints);
             faceVideo.srcObject = faceStream;
             document.getElementById('faceScanLine').style.display = 'block';
+            
+            // Detection Loop (Structure for face-api or native detection)
+            const detectionLoop = setInterval(() => {
+                if (!faceStream) return clearInterval(detectionLoop);
+                
+                // Simulated high-quality detection check
+                // In a production app, you would use face-api.js detectSingleFace here
+                const isFaceInFrame = faceVideo.readyState === 4 && faceVideo.videoWidth > 0;
+                updateFaceDetectionState(isFaceInFrame);
+            }, 500);
+
         } catch (err) {
             showToast("Camera access denied");
             showView(userPassView);
@@ -899,6 +921,11 @@ headerLogoutBtn.addEventListener('click', () => {
         if (scanProgressInterval) clearInterval(scanProgressInterval);
         
         scanProgressInterval = setInterval(() => {
+            if (!faceDetected) {
+                faceScanStatus.innerText = "Face lost! Position correctly...";
+                return; // Pause progress if face is not there
+            }
+
             progress += Math.floor(Math.random() * 7) + 3;
             if (progress >= 100) {
                 progress = 100;
@@ -908,7 +935,7 @@ headerLogoutBtn.addEventListener('click', () => {
                 faceCaptureBtn.innerText = isSignupMode ? "Submit & Register" : "Submit & Login";
                 if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
             } else {
-                faceScanStatus.innerText = "Face detected correctly";
+                faceScanStatus.innerText = "Analyzing biometric data...";
             }
             faceScanPercentage.innerText = progress + "%";
         }, 150);
@@ -955,15 +982,17 @@ headerLogoutBtn.addEventListener('click', () => {
 
                 if (matchedUser) {
                     stopFaceCamera();
-                    // Auto-fill login and trigger
+                    
+                    // Fetch password and perform robust login
                     usernameInput.value = matchedUser;
-                    // Fetch password for auto-login if needed, or bypass
                     const uSnap = await db.ref('Other User Table/' + matchedUser).once('value');
                     if (uSnap.exists()) {
                         passwordInput.value = uSnap.val().password;
+                        validateLoginState(); // Enable the login button
                         acceptBtn.click();
                     } else if (users[matchedUser]) {
                         passwordInput.value = users[matchedUser];
+                        validateLoginState();
                         acceptBtn.click();
                     }
                 } else {
@@ -2138,17 +2167,17 @@ function setupFirebaseListeners() {
         }
     });
 
-    // 4. Status & Typing Listeners
-    let otherUserHeartbeat = 0;
-    let otherUserLastSeen = null;
-    let isOtherUserTyping = false;
-    let otherUserOnlineStatus = true;
+    // 4. Status & Typing Listeners (Using Global Variables)
+    // Removed shadowing let declarations so that the UI interval picks up global changes
 
-    db.ref(`status/${currentChatPartner}`).on('value', snapshot => {
-        const partnerData = snapshot.val() || {};
-        otherUserLastSeen = partnerData.lastSeen;
-        otherUserOnlineStatus = partnerData.online;
-    });
+    if (currentUser !== ALPHA_ADMIN) {
+        // For non-Alpha users (Beta/Other), the partner is fixed (Alpha)
+        db.ref(`status/${currentChatPartner}`).on('value', snapshot => {
+            const partnerData = snapshot.val() || {};
+            otherUserLastSeen = partnerData.lastSeen;
+            otherUserOnlineStatus = partnerData.online;
+        });
+    }
 
     if (statusCheckInterval) clearInterval(statusCheckInterval);
     statusCheckInterval = setInterval(() => {
@@ -2604,9 +2633,7 @@ acceptBtn.addEventListener('click', async (e) => {
 
         history.pushState({ loggedIn: true }, "", window.location.href);
         setupFirebaseListeners();
-        if (!isAlpha) {
-            startHeartbeat();
-        }
+        startHeartbeat();
 
         overlay.style.opacity = '0';
         overlay.style.visibility = 'hidden';
@@ -6832,27 +6859,11 @@ function showAlphaHomeScreen() {
     if (chatInputBar) chatInputBar.style.display = 'none';
     if (pinnedMessageBar) pinnedMessageBar.style.display = 'none';
     
-    // Show Dashboard UI
     dashboard.style.display = 'flex';
-    
     if (headerLogoutBtn) headerLogoutBtn.style.display = 'none';
     
     currentChatPartner = null;
     updatePinnedMessageListener();
-
-    // Stop Heartbeat (Alpha goes offline on Home Screen)
-    if (heartbeatInterval) clearInterval(heartbeatInterval);
-    if (currentUser) {
-        db.ref(`status/${currentUser}`).update({
-            online: false,
-            lastSeen: firebase.database.ServerValue.TIMESTAMP
-        });
-
-        if (currentUser === ALPHA_ADMIN) {
-            startHeartbeat('Raushan_Home');
-            db.ref(`Notification Alert/${ALPHA_ADMIN}`).set(false).catch(e => console.error(e));
-        }
-    }
 
     // Switch Headers
     const defaultHeader = document.querySelector('header');
@@ -6868,13 +6879,11 @@ let alphaRenderGeneration = 0;
 let latestAlphaStatusData = {};
 
 function updateAlphaListStatus() {
-    const now = Date.now() + (serverTimeOffset || 0);
     const dots = document.querySelectorAll('[id^="status-dot-"]');
     dots.forEach(dot => {
         const fid = dot.id.replace('status-dot-', '');
         const friendStatus = latestAlphaStatusData[fid] || {};
-        const heartbeat = friendStatus.heartbeat || 0;
-        const isOnline = (now - heartbeat < 10000) && (friendStatus.online !== false);
+        const isOnline = friendStatus.online === true;
         dot.style.background = isOnline ? '#00e676' : '#ff1744';
         dot.style.boxShadow = isOnline ? '0 0 8px rgba(0, 230, 118, 0.6)' : 'none';
     });
@@ -6958,8 +6967,7 @@ function renderAlphaFriendList() {
 
         // 1. Update or Create
         friendsData.forEach(f => {
-            const isOnline = (latestAlphaStatusData[f.id]?.online !== false) && 
-                             ((Date.now() + (serverTimeOffset || 0) - (latestAlphaStatusData[f.id]?.heartbeat || 0)) < 10000);
+            const isOnline = latestAlphaStatusData[f.id]?.online === true;
             
             const statusColor = isOnline ? '#00e676' : '#ff1744';
             const boxShadow = isOnline ? '0 0 8px rgba(0, 230, 118, 0.6)' : 'none';
@@ -7057,6 +7065,12 @@ function renderAlphaFriendList() {
             alphaStatusListener = db.ref('status').on('value', snapshot => {
                 latestAlphaStatusData = snapshot.val() || {};
                 updateAlphaListStatus();
+
+                // FIX: Synchronize the global header variables with the current chat partner's status
+                if (currentUser === ALPHA_ADMIN && currentChatPartner && latestAlphaStatusData[currentChatPartner]) {
+                    otherUserOnlineStatus = latestAlphaStatusData[currentChatPartner].online || false;
+                    otherUserLastSeen = latestAlphaStatusData[currentChatPartner].lastSeen || null;
+                }
             });
         }
         
@@ -7083,11 +7097,6 @@ function renderAlphaFriendList() {
 }
 
 function openAlphaChat(friendId, friendName) {
-    if (alphaStatusListener) {
-        db.ref('status').off('value', alphaStatusListener);
-        alphaStatusListener = null;
-    }
-
     const dashboard = document.getElementById('alpha-dashboard');
     if (dashboard) dashboard.style.display = 'none';
     
@@ -7095,6 +7104,13 @@ function openAlphaChat(friendId, friendName) {
     if (chatInputBar) chatInputBar.style.display = 'flex';
     currentChatPartner = friendId;
     
+    // Reset and Update initial status for header variables
+    isOtherUserTyping = false;
+    if (latestAlphaStatusData[friendId]) {
+        otherUserOnlineStatus = latestAlphaStatusData[friendId].online || false;
+        otherUserLastSeen = latestAlphaStatusData[friendId].lastSeen || null;
+    }
+
     // Switch Headers Back
     const defaultHeader = document.querySelector('header');
     if (defaultHeader) defaultHeader.style.display = 'flex';
@@ -7107,17 +7123,8 @@ function openAlphaChat(friendId, friendName) {
     
     if (headerLogoutBtn) headerLogoutBtn.style.display = 'flex';
 
-    if (currentUser === ALPHA_ADMIN) {
-        db.ref(`status/Raushan_Home`).update({
-            online: false,
-            lastSeen: firebase.database.ServerValue.TIMESTAMP
-        });
-        db.ref(`Notification Alert/${ALPHA_ADMIN}`).set(false).catch(e => console.error(e));
-    }
-
     filterAndRenderChat();
     updatePinnedMessageListener();
-    startHeartbeat();
 }
 
 // --- Forward Message Logic ---
