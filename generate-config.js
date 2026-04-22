@@ -18,23 +18,23 @@ if (fs.existsSync(envPath)) {
 
 const config = `// AUTO-GENERATED FROM .ENV - DO NOT EDIT MANUALLY
 const envUserNames = {
-    alpha: "${env.ALPHA_USER || 'Raushan_143'}",
-    beta: "${env.BETA_USER || 'Nisha_143'}"
+    alpha: "${process.env.ALPHA_USER || env.ALPHA_USER || 'Raushan_143'}",
+    beta: "${process.env.BETA_USER || env.BETA_USER || 'Nisha_143'}"
 };
 
 const envUsers = {
-    "${env.ALPHA_USER || 'Raushan_143'}": "${env.ALPHA_PASS || ''}",
-    "${env.BETA_USER || 'Nisha_143'}": "${env.BETA_PASS || ''}"
+    "${process.env.ALPHA_USER || env.ALPHA_USER || 'Raushan_143'}": "${process.env.ALPHA_PASS || env.ALPHA_PASS || ''}",
+    "${process.env.BETA_USER || env.BETA_USER || 'Nisha_143'}": "${process.env.BETA_PASS || env.BETA_PASS || ''}"
 };
 
 const envFirebaseConfig = {
-    apiKey: "${env.FIREBASE_API_KEY || ''}",
-    authDomain: "${env.FIREBASE_AUTH_DOMAIN || ''}",
-    databaseURL: "${env.FIREBASE_DATABASE_URL || ''}",
-    projectId: "${env.FIREBASE_PROJECT_ID || ''}",
-    storageBucket: "${env.FIREBASE_STORAGE_BUCKET || ''}",
-    messagingSenderId: "${env.FIREBASE_MESSAGING_SENDER_ID || ''}",
-    appId: "${env.FIREBASE_APP_ID || ''}"
+    apiKey: "${process.env.FIREBASE_API_KEY || env.FIREBASE_API_KEY || ''}",
+    authDomain: "${process.env.FIREBASE_AUTH_DOMAIN || env.FIREBASE_AUTH_DOMAIN || ''}",
+    databaseURL: "${process.env.FIREBASE_DATABASE_URL || env.FIREBASE_DATABASE_URL || ''}",
+    projectId: "${process.env.FIREBASE_PROJECT_ID || env.FIREBASE_PROJECT_ID || ''}",
+    storageBucket: "${process.env.FIREBASE_STORAGE_BUCKET || env.FIREBASE_STORAGE_BUCKET || ''}",
+    messagingSenderId: "${process.env.FIREBASE_MESSAGING_SENDER_ID || env.FIREBASE_MESSAGING_SENDER_ID || ''}",
+    appId: "${process.env.FIREBASE_APP_ID || env.FIREBASE_APP_ID || ''}"
 };`;
 
 try {

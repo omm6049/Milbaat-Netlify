@@ -116,9 +116,10 @@ const headerLogoutBtn = document.createElement('div');
 headerLogoutBtn.id = 'headerLogoutBtn';
 headerLogoutBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px; display: block; margin: auto;"><path d="M20 11H8.8l4.9-4.9L12.3 4.7 5 12l7.3 7.3 1.4-1.4-4.9-4.9H20z"/></svg>';
 headerLogoutBtn.style.cssText = 'width: 35px; height: 35px; cursor: pointer; display: none; align-items: center; justify-content: center; margin-right: 5px;';
-headerLogoutBtn.onclick = () => {
+
+headerLogoutBtn.addEventListener('click', () => {
     if (typeof showAlphaHomeScreen === 'function') showAlphaHomeScreen();
-};
+});
 
 // --- Dynamic Header Setup ---
 (function setupHeader() {
@@ -225,8 +226,12 @@ headerLogoutBtn.onclick = () => {
                 emojiBtn.id = 'emojiBtn';
                 emojiBtn.innerHTML = '<svg viewBox="0 0 24 24" style="width: 26px; height: 26px;"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="10" r="1.2" fill="currentColor"/><circle cx="15" cy="10" r="1.2" fill="currentColor"/><path d="M8.5 14c1.2 1.5 5.8 1.5 7 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
                 emojiBtn.style.cssText = 'background: transparent; border: none; padding: 0 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: rgba(255, 255, 255, 0.7); transition: transform 0.2s;';
-                emojiBtn.onmouseover = () => emojiBtn.style.transform = 'scale(1.1)';
-                emojiBtn.onmouseout = () => emojiBtn.style.transform = 'scale(1)';
+                emojiBtn.addEventListener('mouseenter', () => {
+                    emojiBtn.style.transform = 'scale(1.1)';
+                });
+                emojiBtn.addEventListener('mouseleave', () => {
+                    emojiBtn.style.transform = 'scale(1)';
+                });
                 
                 inputWrapper.appendChild(emojiBtn);
 

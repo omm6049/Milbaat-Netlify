@@ -11,7 +11,9 @@ try {
     const envPath = path.join(__dirname, '.env');
     if (fs.existsSync(envPath)) {
         const data = fs.readFileSync(envPath, 'utf8');
-        data.split('\n').forEach(line => {
+        data.split(/\r?\n/).forEach(line => {
+            line = line.trim();
+            if (!line || line.startsWith('#')) return;
             const parts = line.split('=');
             if (parts.length >= 2) {
                 const key = parts[0].trim();
@@ -114,8 +116,9 @@ server.listen(port, () => {
     const dbUrl = process.env.DATABASE_URL || env.DATABASE_URL || (firebaseConfig ? firebaseConfig.databaseURL : null);
 
     if (dbUrl) {
+        // Use a timeout to prevent the server start from hanging if Firebase is slow
         const checkUrl = dbUrl.endsWith('/') ? `${dbUrl}.json` : `${dbUrl}/.json`;
-        https.get(checkUrl, (res) => {
+        const request = https.get(checkUrl, { timeout: 5000 }, (res) => {
             if (res.statusCode === 200 || res.statusCode === 401) {
                 console.log("Firebase connected successfully..");
             } else {
