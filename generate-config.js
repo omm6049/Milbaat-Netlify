@@ -42,7 +42,7 @@ try {
     console.log('--------------------------------------------------');
     console.log('✅ Userdetails.js has been successfully updated!');
     console.log('📂 Location: ' + path.join(__dirname, 'Userdetails.js'));
-    console.log('🚀 You can now open milbaat.html directly.');
+    console.log('🚀 You can now open index.html directly.');
     console.log('--------------------------------------------------');
 } catch (err) {
     console.error('❌ Error writing Userdetails.js:', err.message);
