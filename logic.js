@@ -56,9 +56,7 @@ const pinMsgBtn = document.getElementById('pinMsgBtn');
 const deleteMsgOptionBtn = document.getElementById('deleteMsgOptionBtn');
 const cancelMsgOptions = document.getElementById('cancelMsgOptions');
 const pinnedMessageBar = document.getElementById('pinnedMessageBar');
-const pinnedSender = document.getElementById('pinnedSender');
 const pinnedText = document.getElementById('pinnedText');
-const unpinBtn = document.getElementById('unpinBtn');
 const replyPreview = document.getElementById('replyPreview');
 const replySender = document.getElementById('replySender');
 const replyText = document.getElementById('replyText');
@@ -77,7 +75,6 @@ const sendImageBtn = document.getElementById('sendImageBtn');
 const imageViewerModal = document.getElementById('image-viewer-modal');
 const viewerImage = document.getElementById('viewerImage');
 const closeViewerBtn = document.getElementById('closeViewerBtn');
-const zoomSlider = document.getElementById('zoomSlider');
 const cameraLiveOverlay = document.getElementById('camera-live-overlay');
 const cameraVideo = document.getElementById('cameraVideo');
 const closeCameraBtn = document.getElementById('closeCameraBtn');
@@ -111,14 +108,43 @@ const acceptCallBtn = document.getElementById('acceptCallBtn');
 const rejectCallBtn = document.getElementById('rejectCallBtn');
 const callPipBtn = document.getElementById('callPipBtn');
 
+// --- Call UI SVG Icons ---
+const CALL_ICONS = {
+    minimize: `<svg width="50%" height="50%" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"><g stroke="currentColor" stroke-width="6" stroke-linecap="square" fill="currentcolor"><path d="M52 8 L31 29" /><path d="M31 15 V29 H45" /><path d="M8 52 L29 31" /><path d="M29 45 V31 H15" /></g></svg>`,
+    speaker: `<svg width="70%" height="70%" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M4 10H7.5L12 6V18L7.5 14H4Z"/><path d="M15 9.2C16.3 10.1 17 11.3 17 12.5C17 13.7 16.3 14.9 15 15.8L13.9 14.6C14.8 13.9 15.2 13.2 15.2 12.5C15.2 11.8 14.8 11.1 13.9 10.4Z"/><path d="M17.6 7.2C19.5 8.7 20.5 10.5 20.5 12.5C20.5 14.5 19.5 16.3 17.6 17.8L16.4 16.5C17.9 15.3 18.7 13.9 18.7 12.5C18.7 11.1 17.9 9.7 16.4 8.5Z"/></svg>`,
+    earpiece: `<svg width="70%" height="70%" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11c0-4.97 4.03-9 9-9s9 4.03 9 9" /><rect x="2" y="11" width="4" height="8" rx="2" fill="currentColor"/><rect x="18" y="11" width="4" height="8" rx="2" fill="currentColor"/><path d="M21 11v1" /><path d="M3 11v1" /></svg>`,
+    mic: `<svg width="70%" height="70%" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15a3.5 3.5 0 0 0 3.5-3.5V7.5A3.5 3.5 0 0 0 12 4a3.5 3.5 0 0 0-3.5 3.5v4A3.5 3.5 0 0 0 12 15z"/><path d="M18 11.5a6 6 0 0 1-12 0h-2a8 8 0 0 0 7 7.9V22h2v-2.6a8 8 0 0 0 7-7.9z"/></svg>`,
+    micMute: `<svg width="70%" height="70%" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v2" /><path d="M9 13a3 3 0 0 0 5.12-2.12" /><path d="M15 9.34V5a3 3 0 0 0-3-3" /><path d="M17 11a5 5 0 0 1-2.35 4.25" /><path d="M9.34 15.66A5 5 0 0 1 7 11" /><line x1="12" y1="19" x2="12" y2="22" /><line x1="8" y1="22" x2="16" y2="22" /><line x1="23" y1="1" x2="1" y2="23" /></svg>`,
+    video: `<svg width="70%" height="70%" viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7c0-1.1-.9-2-2-2H5C3.9 5 3 5.9 3 7v10c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-3.5l4 4v-11l-4 4z"/></svg>`,
+    videoMute: `<svg width="70%" height="70%" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5.23" /><path d="M22 8l-6 4 6 4V8z" /><line x1="23" y1="1" x2="1" y2="23" /></svg>`,
+    flip: `<svg width="70%" height="70%" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M12 4.5 C9 4.5 6.8 6.1 6 8.8H4.2 L7.6 12.2 L11 8.8H8.8 C9.4 7.4 10.5 6.7 12 6.7 C14.2 6.7 15.8 7.8 16.5 9.8 L18.6 9 C17.6 6.1 15.3 4.5 12 4.5Z"/><path d="M12 19.5 C15 19.5 17.2 17.9 18 15.2H19.8 L16.4 11.8 L13 15.2H15.2 C14.6 16.6 13.5 17.3 12 17.3 C9.8 17.3 8.2 16.2 7.5 14.2 L5.4 15 C6.4 17.9 8.7 19.5 12 19.5Z"/></svg>`,
+    end: `<svg width="100%" height="100%" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="32" cy="32" r="32" fill="#FF3B30"/><path d="M44.5 38.3C44.5 39.5 43.5 40.5 42.3 40.5C39.5 40.5 34.5 39.5 29.5 34.5C24.5 29.5 23.5 24.5 23.5 21.7C23.5 20.5 24.5 19.5 25.7 19.5H30.5C31.2 19.5 31.8 20 31.9 20.7L32.7 25.5C32.8 26.1 32.5 26.8 32 27.2L29.5 29.5C30.5 31.5 32.5 33.5 34.5 34.5L36.8 32C37.2 31.5 37.9 31.2 38.5 31.3L43.3 32.1C44 32.2 44.5 32.8 44.5 33.5V38.3Z" fill="white" transform="rotate(135 32 32)"/></svg>`
+};
+
 // Create Header Logout Button (for Alpha Chat)
 const headerLogoutBtn = document.createElement('div');
 headerLogoutBtn.id = 'headerLogoutBtn';
 headerLogoutBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px; display: block; margin: auto;"><path d="M20 11H8.8l4.9-4.9L12.3 4.7 5 12l7.3 7.3 1.4-1.4-4.9-4.9H20z"/></svg>';
 headerLogoutBtn.style.cssText = 'width: 35px; height: 35px; cursor: pointer; display: none; align-items: center; justify-content: center; margin-right: 5px;';
 
+function showLogoutModal() {
+    if (typeof menuOptions !== 'undefined' && menuOptions) menuOptions.style.display = 'none';
+    if (typeof menuIconBtn !== 'undefined' && menuIconBtn) menuIconBtn.classList.remove('rotate');
+    if (typeof logoutModal !== 'undefined' && logoutModal) {
+        logoutModal.style.display = 'flex';
+        logoutModal.style.zIndex = '10005';
+    }
+    if (typeof mainContent !== 'undefined' && mainContent) mainContent.classList.add('blur-content');
+    const alphaDash = document.getElementById('alpha-dashboard');
+    if (alphaDash) alphaDash.classList.add('blur-content');
+}
+
 headerLogoutBtn.addEventListener('click', () => {
-    if (typeof showAlphaHomeScreen === 'function') showAlphaHomeScreen();
+    if (currentUser === ALPHA_ADMIN) {
+        if (typeof showAlphaHomeScreen === 'function') showAlphaHomeScreen();
+    } else {
+        showLogoutModal();
+    }
 });
 
 // --- Dynamic Header Setup ---
@@ -170,8 +196,7 @@ headerLogoutBtn.addEventListener('click', () => {
     rightContainer.style.cssText = 'display: flex; align-items: center; gap: 5px; margin-left: 5px;';
     
     if (menuIconBtn) {
-        menuIconBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 32px; height: 28px; display: block; margin: auto; transition: transform 0.3s ease;"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>';
-        
+        menuIconBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px; display: block; margin: auto; transition: transform 0.3s ease;"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>';
     }
 
     [videoCallBtn, audioCallBtn, menuIconBtn].forEach(btn => {
@@ -179,11 +204,14 @@ headerLogoutBtn.addEventListener('click', () => {
             btn.style.margin = '0';
             btn.style.border = 'none';
             btn.style.background = 'transparent';
-            btn.style.width = '35px';
-            btn.style.height = '30px';
+            btn.style.width = '32px';
+            btn.style.height = '32px';
             btn.style.padding = '0';
-            const img = btn.querySelector('img');
-            if (img) img.style.cssText = 'width: 100%; height: 100%; object-fit: contain; pointer-events: none;';
+            btn.style.display = 'flex';
+            btn.style.alignItems = 'center';
+            btn.style.justifyContent = 'center';
+            const innerIcon = btn.querySelector('img, svg');
+            if (innerIcon) innerIcon.style.cssText = 'width: 24px; height: 24px; object-fit: contain; pointer-events: none; fill: currentColor;';
             rightContainer.appendChild(btn);
         }
     });
@@ -288,7 +316,7 @@ headerLogoutBtn.addEventListener('click', () => {
 
             // Style & Move Attach/Camera Icons inside wrapper
             if (attachBtn) {
-                attachBtn.innerHTML = '<svg viewBox="0 0 24 24" style="width: 22px; height: 22px;"><path d="M7 2.8h7l4.2 4.2V20a1.6 1.6 0 0 1-1.6 1.6H7.8A1.6 1.6 0 0 1 6.2 20V4.4A1.6 1.6 0 0 1 7.8 2.8z" fill="transparent" stroke="currentColor" stroke-width="1.5"/><path d="M14 2.8V8h4.2" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="9" y1="12" x2="15" y2="12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="9" y1="15" x2="15" y2="15" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="9" y1="18" x2="13.5" y2="18" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
+                attachBtn.innerHTML = '<svg viewBox="0 0 24 24" style="width: 24px; height: 24px;"><path fill="currentColor" d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5a4 4 0 0 0-8 0v12.5c0 3.03 2.47 5.5 5.5 5.5s5.5-2.47 5.5-5.5V6h-1.5z"/></svg>';
             }
             if (cameraBtn) {
                 cameraBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px;"><path d="M20 5h-3.2l-1.8-2H9L7.2 5H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>';
@@ -310,19 +338,24 @@ headerLogoutBtn.addEventListener('click', () => {
 
             chatInputBar.prepend(inputWrapper);
             
-            // Style Mic & Send Buttons (Outside)
-            const actionBtnStyle = `width: 45px; height: 45px; border-radius: 50%; background: transparent; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; padding: 0;`;
+            // Style Mic & Send Buttons (Inside Shared Circle)
+            const actionContainer = document.createElement('div');
+            actionContainer.id = 'mic-send-action-container';
+            actionContainer.style.cssText = 'width: 45px; height: 45px; border-radius: 50%; background: #10eb5c; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.2);';
+
+            const btnStyle = `width: 100%; height: 100%; background: transparent !important; border: none !important; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; color: black !important; box-shadow: none !important;`;
             
             if (micBtn) {
-                micBtn.style.cssText = actionBtnStyle + ' color: white;';
-                micBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 30px;"><path d="M12 15a3.5 3.5 0 0 0 3.5-3.5V7.5A3.5 3.5 0 0 0 12 4a3.5 3.5 0 0 0-3.5 3.5v4A3.5 3.5 0 0 0 12 15z"/><path d="M18 11.5a6 6 0 0 1-12 0h-2a8 8 0 0 0 7 7.9V22h2v-2.6a8 8 0 0 0 7-7.9z"/></svg>';
-                chatInputBar.appendChild(micBtn);
+                micBtn.style.cssText = btnStyle;
+                micBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 22px; height: 22px;"><path d="M12 15a3.5 3.5 0 0 0 3.5-3.5V7.5A3.5 3.5 0 0 0 12 4a3.5 3.5 0 0 0-3.5 3.5v4A3.5 3.5 0 0 0 12 15z"/><path d="M18 11.5a6 6 0 0 1-12 0h-2a8 8 0 0 0 7 7.9V22h2v-2.6a8 8 0 0 0 7-7.9z"/></svg>';
+                actionContainer.appendChild(micBtn);
             }
             if (sendMsgBtn) {
-                sendMsgBtn.style.cssText = actionBtnStyle + ' display: none; background: #168946 !important; color: white !important; '; // Hidden initially
+                sendMsgBtn.style.cssText = btnStyle + ' display: none;';
                 sendMsgBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px; margin-left: 2px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
-                chatInputBar.appendChild(sendMsgBtn);
+                actionContainer.appendChild(sendMsgBtn);
             }
+            chatInputBar.appendChild(actionContainer);
         }
 
         // Fix: Move Reply Preview inside Footer to eliminate gap
@@ -370,6 +403,49 @@ headerLogoutBtn.addEventListener('click', () => {
     }
 })();
 
+// --- Setup Custom Voice Message UI Styles ---
+(function setupVoiceMessageStyle() {
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .voice-message-bubble {
+            background-color: rgba(255,255,255,0.15);
+            border-radius: 25px;
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+            width: fit-content;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-top: 5px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .cvm-controls { display: flex; align-items: center; gap: 8px; }
+        .cvm-play-btn {
+            width: 34px; height: 34px; border-radius: 50%;
+            background-color: #5865f2; border: none; cursor: pointer;
+            display: flex; justify-content: center; align-items: center; flex-shrink: 0;
+            transition: transform 0.1s;
+        }
+        .cvm-play-btn:active { transform: scale(0.9); }
+        .cvm-play-icon {
+            width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+            border-left: 9px solid white; margin-left: 2px;
+        }
+        .playing .cvm-play-icon {
+            width: 10px; height: 10px; border: none;
+            background: linear-gradient(to right, white 0%, white 30%, transparent 30%, transparent 70%, white 70%, white 100%);
+            margin-left: 0;
+        }
+        .cvm-waveform { display: flex; align-items: center; gap: 2px; height: 30px; }
+        .cvm-bar { width: 2.5px; background-color: #72767d; border-radius: 1px; min-height: 3px; }
+        .playing .cvm-bar { animation: cvm-pulse 0.8s infinite ease-in-out; background-color: #5865f2; }
+        @keyframes cvm-pulse { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.6); } }
+        .cvm-timer { color: inherit; font-size: 13px; font-weight: 600; margin: 0 2px; min-width: 32px; opacity: 0.8; font-family: monospace; }
+        .cvm-speaker-btn { background: none; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; pointer-events: none; }
+        .cvm-speaker-icon { width: 18px; height: 18px; fill: currentColor; opacity: 0.7; }
+    `;
+    document.head.appendChild(style);
+})();
+
 // --- Initialize Message Bubble Style ---
 (function initMsgStyle() {
     const msgStyle = document.createElement('style');
@@ -377,8 +453,8 @@ headerLogoutBtn.addEventListener('click', () => {
     // Default Dark Theme (Gray)
     msgStyle.innerHTML = `.message-bubble { max-width: 75%; word-wrap: break-word; padding: 10px; border-radius: 10px; margin-bottom: 5px; } .msg-sent { align-self: flex-end; margin-left: auto; text-align: left; background-color: rgba(45, 52, 54, 0.9) !important; color: white !important; border-bottom-right-radius: 0; } .msg-received { align-self: flex-start; margin-right: auto; text-align: left; background-color: rgba(45, 52, 54, 0.9) !important; color: white !important; border-bottom-left-radius: 0; } #chatMessages .message-bubble.msg-selected, #chatMessages .msg-sent.msg-selected, #chatMessages .msg-received.msg-selected { background: #ff9f43 !important; transition: background 0.2s; }`;
     const isLight = document.body.classList.contains('light-mode');
-    const bubbleBgSent = isLight ? 'rgba(210, 235, 255, 0.95)' : 'rgba(45, 52, 54, 0.9)';
-    const bubbleBgRcv = isLight ? 'rgba(240, 240, 245, 0.95)' : 'rgba(45, 52, 54, 0.9)';
+    const bubbleBgSent = isLight ? '#d9fdd3' : '#005c4b';
+    const bubbleBgRcv = isLight ? '#ffffff' : '#202c33';
     const textColor = isLight ? '#000000' : 'white';
     msgStyle.innerHTML = `.message-bubble { max-width: 75%; word-wrap: break-word; padding: 10px; border-radius: 10px; margin-bottom: 5px; } .msg-sent { align-self: flex-end; margin-left: auto; text-align: left; background-color: ${bubbleBgSent} !important; color: ${textColor} !important; border-bottom-right-radius: 0; } .msg-received { align-self: flex-start; margin-right: auto; text-align: left; background-color: ${bubbleBgRcv} !important; color: ${textColor} !important; border-bottom-left-radius: 0; } #chatMessages .message-bubble.msg-selected, #chatMessages .msg-sent.msg-selected, #chatMessages .msg-received.msg-selected { background: #ff9f43 !important; color: white !important; transition: background 0.2s; }`;
     document.head.appendChild(msgStyle);
@@ -468,13 +544,13 @@ headerLogoutBtn.addEventListener('click', () => {
             width: 100% !important;
             z-index: 995 !important;
             box-sizing: border-box !important;
-            background: rgba(30, 30, 40, 0.95);
+            background: #0F172A !important;
             backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom: 2px solid lightgreen !important;
         }
         body.light-mode #pinnedMessageBar {
-            background: rgba(245, 245, 245, 0.95);
-            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            background: #0F172A !important;
+            border-bottom: 2px solid lightgreen !important;
         }
     `;
     document.head.appendChild(style);
@@ -483,42 +559,51 @@ headerLogoutBtn.addEventListener('click', () => {
     const callStyle = document.createElement('style');
     callStyle.id = 'call-ui-styles';
     callStyle.innerHTML = `
-        #call-overlay .call-header, #call-overlay .call-footer {
-            position: absolute; left: 0; width: 100%; display: flex; align-items: center;
-            padding: 15px; box-sizing: border-box; z-index: 10;
-            background: rgba(0, 0, 0, 0.3); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+        #call-overlay .call-header { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 65px;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            padding: 0 15px;
+            background: #0F172A !important;
+            border-bottom: 2px solid rgba(24, 132, 210, 0.934) !important;
+            box-sizing: border-box;
+            z-index: 100;
             color: white;
         }
-        #call-overlay .call-header { 
-            top: 0; 
-            display: flex; 
-            justify-content: space-between;
+
+        #callHeaderStatusWrapper {
+            display: flex;
+            flex-direction: column;
             align-items: center;
-            padding: 15px 15px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1); 
-            width: 100%;
-            box-sizing: border-box;
-            overflow: hidden;
+            justify-content: center;
+            pointer-events: none;
+            padding: 0 10px;
+            text-align: center;
         }
-        
-        /* --- Call Header Manual Styling --- */
-        
-        /* 1. Name Text Size */
+
+        #callStatusText, #callTimer { 
+            font-size: 10px;
+            font-weight: bold;
+            margin: 0;
+            letter-spacing: 0.5px; 
+        }
+
         #callHeaderName { 
-            font-size: 20px; /* <-- Change Name Size Here */
+            font-size: 18px;
+            font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            justify-self: start;
+            text-align: left;
+            max-width: 100%;
         }
 
         /* 2. PiP Icon Size */
         #callPipBtn { 
-            width: 40px; height: 40px;
-            /* Manual Margins */
-            margin-top: -10px;
-            margin-bottom: 0px;
-            margin-left: 0px;
-            margin-right: 0px;
-            
-            /* Remove Border/Background */
-            background-color: #1bb5c3ff !important; 
+            width: 35px; height: 35px;
+            background-color: #1bb5c3ff !important;
             border: none !important;
             outline: none !important;
             color: white;
@@ -528,45 +613,22 @@ headerLogoutBtn.addEventListener('click', () => {
             justify-content: center !important;
             line-height: 1 !important;
             cursor: pointer !important;
+            justify-self: end;
         }
         #callPipBtn svg { pointer-events: none; }
 
-        /* 3. Status Text (Ringing...) Size */
-        #callStatusText { 
-            font-size: 2px; /* <-- Change Status Size Here */
-            font-weight: 50; margin-bottom: 2px; letter-spacing: 0.5px; 
-        }
-
-        /* 4. Timer Text Size */
-        #callTimer { 
-            font-size: 13px; /* <-- Change Timer Size Here */
-            font-weight: bold; 
-        }
-
-        #callHeaderCenter { 
-            position: absolute;
-            top: 60px; /* Position below header */
-            left: 0; width: 100%;
-            text-align: center; 
-            display: flex; flex-direction: column; align-items: center; 
-            z-index: 20; pointer-events: none;
+        #call-overlay .call-footer { 
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 80px;
+            display: flex; align-items: center; justify-content: center;
+            padding: 0 20px; box-sizing: border-box; z-index: 100;
+            background: #0F172A !important;
+            border-top: 2px solid rgba(24, 132, 210, 0.934) !important;
+            gap: 15px;
+            color: white;
         }
         
         .blink-anim { animation: blinkText 1.5s infinite; }
         @keyframes blinkText { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
-
-        /* --- Call Footer Styling Section --- */
-        #call-overlay .call-footer { 
-            bottom: 0; 
-            border-top: 1px solid rgba(255, 255, 255, 0.1); 
-            width: 100%; 
-            box-sizing: border-box;
-            
-            /* --- Manual Layout Settings --- */
-            justify-content: center; /* Options: space-between, center, space-around */
-            gap: 15px;               /* Space between icons */
-            padding: 15px 20px;      /* Footer padding */
-        }
 
         /* --- Audio Call Specific Styling (3 Icons) --- */
         #call-overlay.audio-only .call-footer {
@@ -605,29 +667,33 @@ headerLogoutBtn.addEventListener('click', () => {
         /* --- Call End Button Styling Section --- */
         #callEndBtn { 
             /* Manual Settings */
-            background-color: #4eb5dbff !important; /* Red background */
+            background-color: transparent !important;
             width: 50px !important;  /* Match others */
             height: 50px !important; /* Match others */
             padding: 2px !important; /* Icon padding */
             box-shadow: 0 4px 15px rgba(118, 187, 197, 0.4);
         }
 
-        #callRemoteVideo { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+        #callVideoContainer, #callAudioContainer {
+            position: absolute !important;
+            top: 65px !important;
+            bottom: 80px !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: calc(100% - 145px) !important;
+            z-index: 1;
+            overflow: hidden;
+        }
+
+        #callRemoteVideo { width: 100%; height: 100%; object-fit: cover; }
         #callLocalVideo {
-            position: absolute; top: 80px; right: 15px;
+            position: absolute; top: 80px; right: 15px; z-index: 11;
             width: clamp(100px, 25vw, 140px); height: clamp(150px, 40vw, 210px);
             border: 2px solid rgba(255, 255, 255, 0.7); border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3); object-fit: cover; z-index: 11;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3); object-fit: cover; 
             cursor: move; background-color: #000;
             transition: top 0.3s ease, left 0.3s ease, right 0.3s ease, bottom 0.3s ease;
         }
-        /* Light Theme */
-        body.light-mode #call-overlay .call-header, body.light-mode #call-overlay .call-footer {
-            background: rgba(245, 245, 245, 0.8); color: #333; border-color: rgba(0, 0, 0, 0.1);
-        }
-        body.light-mode #call-overlay .call-footer button { background: transparent; color: #333; }
-        body.light-mode #callLocalVideo { border-color: rgba(0, 0, 0, 0.4); }
-
         /* Custom PiP View Styles */
         #custom-pip-view {
             position: fixed;
@@ -785,250 +851,247 @@ headerLogoutBtn.addEventListener('click', () => {
     pwdInput.style.boxSizing = 'border-box';
 })();
 
-// --- Facelock System Logic ---
-(function setupFacelockFeatures() {
-    const userPassView = document.getElementById('user-pass-view');
-    const facelockView = document.getElementById('facelock-view');
-    const landingLogo = document.getElementById('landingLogo');
-    const faceVideo = document.getElementById('faceScanVideo');
-    const faceScanContainer = document.getElementById('faceScanContainer');
-    const faceScanPercentage = document.getElementById('faceScanPercentage');
-    const faceScanStatus = document.getElementById('faceScanStatus');
-    const faceCaptureBtn = document.getElementById('faceCaptureBtn');
-    const faceRetryLink = document.getElementById('faceRetryLink');
-    const faceCredsModal = document.getElementById('facelock-creds-modal');
+// --- Num Code System Logic ---
+(function setupNumCodeFeatures() {
+    const numModal = document.getElementById('numcode-modal');
+    const regModal = document.getElementById('numcode-register-modal');
+    const display = document.getElementById('numcode-display');
+    const regBtn = document.getElementById('registerNumCodeBtn');
+    const errDisplay = document.getElementById('numSignupError');
     
-    let faceStream = null;
-    let isSignupMode = false;
-    let faceDetected = false;
-    let scanProgressInterval = null;
+    let currentPin = "";
+    let numCodeMap = {}; // Maps numCode -> { userId, password }
 
-    function showView(view) {
-        [userPassView, facelockView].forEach(v => {
-            if (v) v.style.display = 'none';
-        });
-        if (view) view.style.display = 'flex';
-        
-        // Hide logo only on Facelock view as requested
-        if (landingLogo) {
-            landingLogo.style.display = (view === facelockView) ? 'none' : 'block';
+    // Fetch num codes from Firebase
+    async function fetchNumCodes() {
+        try {
+            const snap = await db.ref('numcode_data').once('value');
+            numCodeMap = {};
+            if (snap.exists()) {
+                const data = snap.val();
+                for (let key in data) {
+                    if (typeof data[key] === 'object') {
+                        numCodeMap[key] = data[key];
+                    } else {
+                        // Support for legacy format
+                        numCodeMap[data[key]] = { userId: key };
+                    }
+                }
+            }
+        } catch(e) {
+            console.error("Error fetching num codes:", e);
         }
     }
 
-    // Navigation
+    // Open Num Code Modal
     document.addEventListener('click', (e) => {
-        if (e.target.id === 'faceLoginLink') {
-            showView(facelockView);
-            startFaceCamera();
+        if (e.target.id === 'numCodeLoginLink') {
+            currentPin = "";
+            if(display) display.innerText = "";
+            if(regBtn) {
+                regBtn.innerText = "Register";
+                regBtn.style.background = "#00d2ff";
+            }
+            if(numModal) numModal.style.display = 'flex';
+            fetchNumCodes(); // Refresh codes
         }
     });
 
-    document.getElementById('faceBackLink').onclick = () => {
-        stopFaceCamera();
-        showView(userPassView);
-    };
-
-    function updateFaceDetectionState(detected) {
-        faceDetected = detected;
-        if (faceScanContainer) {
-            faceScanContainer.style.borderColor = detected ? "#2ecc71" : "#ff4757";
-        }
-        faceScanStatus.style.color = detected ? "#2ecc71" : "#ff4757";
+    // Close Num Code Modal
+    const cancelBtn = document.getElementById('cancelNumCodeBtn');
+    if(cancelBtn) {
+        cancelBtn.onclick = () => {
+            if(numModal) numModal.style.display = 'none';
+        };
     }
 
-    // Verify (Login)
-    document.getElementById('faceVerifyLink').onclick = () => {
-        if (!faceDetected) return showToast("No face detected!");
-        isSignupMode = false;
-        faceRetryLink.style.visibility = 'hidden';
-        faceCaptureBtn.style.display = 'none';
-        faceScanPercentage.innerText = "0%";
-        startScanningProgress();
-    };
-
-    // Register (Signup)
-    document.getElementById('faceRegisterLink').onclick = () => {
-        if (!faceDetected) return showToast("No face detected!");
-        faceCredsModal.style.display = 'flex';
-    };
-
-    document.getElementById('cancelFaceCredsBtn').onclick = () => {
-        faceCredsModal.style.display = 'none';
-    };
-
-    document.getElementById('confirmFaceCredsBtn').onclick = async () => {
-        const userId = document.getElementById('faceSignupUser').value.trim();
-        const password = document.getElementById('faceSignupPass').value.trim();
-        const passkey = document.getElementById('faceSignupKey').value.trim();
-
-        if (!userId || !password || passkey !== "Raushan_Mil_Baat_143") {
-            showToast("Invalid credentials or passkey");
-            return;
-        }
-
-        // Check if facelock already registered for this user
-        const faceSnap = await db.ref('facelock_data/' + userId).once('value');
-        if (faceSnap.exists()) {
-            showToast("Facelock with this credential already registered");
-            return;
-        }
-
-        // Validate against existing users
-        const snap = await db.ref('Other User Table/' + userId).once('value');
-        let isValid = false;
-        if (snap.exists() && snap.val().password === password) isValid = true;
-        else if (users[userId] && users[userId] === password) isValid = true;
-
-        if (isValid) {
-            faceCredsModal.style.display = 'none';
-            isSignupMode = true;
-            faceRetryLink.style.visibility = 'hidden';
-            faceCaptureBtn.style.display = 'none';
-            faceScanPercentage.innerText = "0%";
-            faceScanStatus.innerText = `Registering face for ${userId}...`;
-            startScanningProgress();
-        } else {
-            showToast("User not registered or incorrect password");
-        }
-    };
-
-    async function startFaceCamera() {
-        if (faceStream) return;
-        try {
-            const constraints = { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } };
-            faceStream = await navigator.mediaDevices.getUserMedia(constraints);
-            faceVideo.srcObject = faceStream;
-            document.getElementById('faceScanLine').style.display = 'block';
+    async function processNumLogin() {
+        if (numCodeMap[currentPin]) {
+            const userData = numCodeMap[currentPin];
             
-            // Detection Loop (Structure for face-api or native detection)
-            const detectionLoop = setInterval(() => {
-                if (!faceStream) return clearInterval(detectionLoop);
-                
-                // Simulated high-quality detection check
-                // In a production app, you would use face-api.js detectSingleFace here
-                const isFaceInFrame = faceVideo.readyState === 4 && faceVideo.videoWidth > 0;
-                updateFaceDetectionState(isFaceInFrame);
-            }, 500);
-
-        } catch (err) {
-            showToast("Camera access denied");
-            showView(userPassView);
-        }
-    }
-
-    function startScanningProgress() {
-        let progress = 0;
-        if (scanProgressInterval) clearInterval(scanProgressInterval);
-        
-        scanProgressInterval = setInterval(() => {
-            if (!faceDetected) {
-                faceScanStatus.innerText = "Face lost! Position correctly...";
-                return; // Pause progress if face is not there
-            }
-
-            progress += Math.floor(Math.random() * 7) + 3;
-            if (progress >= 100) {
-                progress = 100;
-                clearInterval(scanProgressInterval);
-                faceScanStatus.innerText = "Face fully scanned";
-                faceCaptureBtn.style.display = 'block';
-                faceCaptureBtn.innerText = isSignupMode ? "Submit & Register" : "Submit & Login";
-                if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            if(numModal) numModal.style.display = 'none';
+            showToast("Code accepted. Logging in...");
+            
+            if (typeof usernameInput !== 'undefined') usernameInput.value = userData.userId;
+            
+            // Directly log in if password exists in the new format
+            if (userData.password) {
+                if (typeof passwordInput !== 'undefined') passwordInput.value = userData.password;
+                validateLoginState();
+                acceptBtn.click();
             } else {
-                faceScanStatus.innerText = "Analyzing biometric data...";
-            }
-            faceScanPercentage.innerText = progress + "%";
-        }, 150);
-    }
-
-    function stopFaceCamera() {
-        if (faceStream) {
-            faceStream.getTracks().forEach(t => t.stop());
-            faceStream = null;
-        }
-        if (scanProgressInterval) {
-            clearInterval(scanProgressInterval);
-            scanProgressInterval = null;
-        }
-    }
-
-    faceCaptureBtn.onclick = async () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = faceVideo.videoWidth;
-        canvas.height = faceVideo.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
-        ctx.drawImage(faceVideo, 0, 0);
-        const faceData = canvas.toDataURL('image/jpeg', 0.5);
-
-        if (isSignupMode) {
-            const userId = document.getElementById('faceSignupUser').value.trim();
-            await db.ref(`facelock_data/${userId}`).set(faceData);
-            showToast("Facelock registered successfully!");
-            stopFaceCamera();
-            showView(userPassView);
-        } else {
-            faceScanStatus.innerText = "Authenticating...";
-            const allFacesSnap = await db.ref('facelock_data').once('value');
-            if (allFacesSnap.exists()) {
-                faceCaptureBtn.style.display = 'none';
-                const faces = allFacesSnap.val();
-                let matchedUser = null;
-                for (let uid in faces) {
-                    matchedUser = uid; 
-                    break;
-                }
-
-                if (matchedUser) {
-                    stopFaceCamera();
-                    
-                    // Fetch password and perform robust login
-                    usernameInput.value = matchedUser;
-                    const uSnap = await db.ref('Other User Table/' + matchedUser).once('value');
+                // Fallback fetch user's password for older entries
+                try {
+                    const uSnap = await db.ref('Other User Table/' + userData.userId).once('value');
                     if (uSnap.exists()) {
-                        passwordInput.value = uSnap.val().password;
-                        validateLoginState(); // Enable the login button
-                        acceptBtn.click();
-                    } else if (users[matchedUser]) {
-                        passwordInput.value = users[matchedUser];
+                        if (typeof passwordInput !== 'undefined') passwordInput.value = uSnap.val().password;
                         validateLoginState();
                         acceptBtn.click();
+                    } else if (users[userData.userId]) {
+                        if (typeof passwordInput !== 'undefined') passwordInput.value = users[userData.userId];
+                        validateLoginState();
+                        acceptBtn.click();
+                    } else {
+                        showToast("User details not found");
                     }
-                } else {
-                    showToast("Face not recognized");
-                    faceRetryLink.style.visibility = 'visible';
-                    faceScanStatus.innerText = "Authentication failed";
+                } catch(err) {
+                    console.error(err);
                 }
-            } else {
-                showToast("No facelock data found");
+            }
+            
+            currentPin = "";
+            if(display) display.innerText = "";
+            if(regBtn) {
+                regBtn.innerText = "Register";
+                regBtn.style.background = "#00d2ff";
+            }
+        } else {
+            // Failed Login Attempt
+            if(display && display.parentElement) triggerShake(display.parentElement); 
+            currentPin = "";
+            if(display) display.innerText = "";
+            if(regBtn) {
+                regBtn.innerText = "Register";
+                regBtn.style.background = "#00d2ff";
             }
         }
-    };
+    }
 
-    faceRetryLink.onclick = () => {
-        faceRetryLink.style.visibility = 'hidden';
-        faceCaptureBtn.style.display = 'none';
-        faceScanPercentage.innerText = "0%";
-        faceScanStatus.innerText = "Retrying scan...";
-        startScanningProgress();
-    };
+    // Handle Numpad Clicks
+    document.querySelectorAll('.numpad-btn').forEach(btn => {
+        btn.onclick = async () => {
+            const val = btn.innerText;
+            
+            if (val === '*' || val === '#') {
+                currentPin = "";
+                if(display) display.innerText = "";
+                if(regBtn) {
+                    regBtn.innerText = "Register";
+                    regBtn.style.background = "#00d2ff";
+                }
+                return;
+            }
 
-    // Add CSS for scan animation if not present
-    const style = document.createElement('style');
-    style.innerHTML = `
-        @keyframes scanMove {
-            0% { top: 0; }
-            50% { top: 100%; }
-            100% { top: 0; }
-        }
-        #faceScanLine { display: none; }
-        .login-container > div { 
-            animation: fadeIn 0.3s ease-out; 
-        }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    `;
-    document.head.appendChild(style);
+            currentPin += val;
+            if(display) display.innerText = '*'.repeat(currentPin.length);
+
+            // Transform button automatically to Login Mode
+            if(regBtn) {
+                regBtn.innerText = "Login";
+                regBtn.style.background = "#2ecc71";
+            }
+
+            if (currentPin.length > 8) {
+                if (display && display.parentElement) triggerShake(display.parentElement); 
+                currentPin = "";
+                if (display) display.innerText = "";
+                if (regBtn) {
+                    regBtn.innerText = "Register";
+                    regBtn.style.background = "#00d2ff";
+                }
+            }
+        };
+    });
+
+    if(regBtn) {
+        regBtn.onclick = () => {
+            if (regBtn.innerText === "Register") {
+                if(numModal) numModal.style.display = 'none';
+                if(regModal) regModal.style.display = 'flex';
+                if(errDisplay) errDisplay.style.display = 'none';
+            } else {
+                // Manual Login Execution via button
+                processNumLogin();
+            }
+        };
+    }
+
+    // Close Register Modal
+    const cancelRegBtn = document.getElementById('cancelNumRegisterBtn');
+    if(cancelRegBtn) {
+        cancelRegBtn.onclick = () => {
+            if(regModal) regModal.style.display = 'none';
+            document.getElementById('numSignupUser').value = '';
+            document.getElementById('numSignupPass').value = '';
+            document.getElementById('numSignupKey').value = '';
+            document.getElementById('numSignupCode').value = '';
+            if(errDisplay) errDisplay.style.display = 'none';
+        };
+    }
+
+    // Submit Registration
+    const submitRegBtn = document.getElementById('submitNumRegisterBtn');
+    if(submitRegBtn) {
+        submitRegBtn.onclick = async () => {
+            const userId = document.getElementById('numSignupUser').value.trim();
+            const password = document.getElementById('numSignupPass').value.trim();
+            const passkey = document.getElementById('numSignupKey').value.trim();
+            const codeKey = document.getElementById('numSignupCode').value.trim();
+
+            if (!userId || !password || !codeKey || passkey !== "Raushan_Mil_Baat_143") {
+                if (errDisplay) {
+                    errDisplay.innerText = "Wrong Data Input";
+                    errDisplay.style.display = 'block';
+                }
+                if(regModal) triggerShake(regModal.querySelector('.modal-box'));
+                return;
+            }
+
+            try {
+                const snap = await db.ref('Other User Table/' + userId).once('value');
+                let isValid = false;
+                if (snap.exists() && snap.val().password === password) isValid = true;
+                else if (users[userId] && users[userId] === password) isValid = true;
+
+                if (isValid) {
+                    // Check if code is already used
+                    const allCodesSnap = await db.ref('numcode_data').once('value');
+                    let codeInUse = false;
+                    if (allCodesSnap.exists()) {
+                        const data = allCodesSnap.val();
+                        for (let key in data) {
+                            if (key === codeKey || data[key] === codeKey) {
+                                codeInUse = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (codeInUse) {
+                        if (errDisplay) {
+                            errDisplay.innerText = "Wrong Data Input (Code In Use)";
+                            errDisplay.style.display = 'block';
+                        }
+                        if(regModal) triggerShake(regModal.querySelector('.modal-box'));
+                        return;
+                    }
+
+                    // Save data securely directly to the Num Code
+                    await db.ref(`numcode_data/${codeKey}`).set({
+                        userId: userId,
+                        password: password
+                    });
+                    
+                    showToast("Num Code registered successfully!");
+                    
+                    if(regModal) regModal.style.display = 'none';
+                    document.getElementById('numSignupUser').value = '';
+                    document.getElementById('numSignupPass').value = '';
+                    document.getElementById('numSignupKey').value = '';
+                    document.getElementById('numSignupCode').value = '';
+                    if(errDisplay) errDisplay.style.display = 'none';
+                } else {
+                    if (errDisplay) {
+                        errDisplay.innerText = "Wrong Data Input";
+                        errDisplay.style.display = 'block';
+                    }
+                    if(regModal) triggerShake(regModal.querySelector('.modal-box'));
+                }
+            } catch(e) {
+                console.error(e);
+            }
+        };
+    }
 })();
 
 let cameraStream = null;
@@ -1086,10 +1149,12 @@ let mediaRecorder = null;
 let audioChunks = [];
 let recordingInterval = null;
 let isSendingAudio = false;
+let totalRecordedSeconds = 0;
 let audioContext = null;
 let analyser = null;
 let visualizerDataArray = null;
 let visualizerAnimationId = null;
+let previewAudio = new Audio();
 let lastImageSource = null;
 let callStream = null;
 let callInterval = null;
@@ -1103,6 +1168,9 @@ let pipStartX = 0;
 let peerConnection = null;
 let incomingSignalData = null;
 let currentChatHistory = [];
+let otherUserOnlineStatus = false;
+let otherUserLastSeen = null;
+let isOtherUserTyping = false;
 let allMessagesRaw = [];
 let currentChatPartner = null;
 let candidateQueue = [];
@@ -1132,7 +1200,7 @@ if (!bgOverlay) {
     bgOverlay.id = 'blur-bg-overlay';
     bgOverlay.style.cssText = `
         position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
-            filter: blur(0px); transform: scale(1.1); background-color: #161B16;
+            filter: blur(0px); transform: scale(1.1); background-color: #0b141a;
     `;
 
     document.body.appendChild(bgOverlay);
@@ -1155,58 +1223,99 @@ if (!bgImage && bgOverlay) {
         document.body.prepend(header);
     }
 
-    // Style: Light background for black icons visibility, equal spacing
     header.style.cssText = `
         position: fixed; top: 0; left: 0; width: 100%; height: 65px;
-        display: none; align-items: center; justify-content: space-around; padding: 0 15px;
-        background: rgba(18, 131, 162, 1); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-        border-bottom: 1px solid rgba(0, 0, 0, 0.1); z-index: 1001; box-sizing: border-box;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); color: black;
+        display: none; align-items: center; justify-content: space-between; padding: 0 15px;
+        background: #0F172A !important; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        border-bottom: 2px solid rgb(31, 191, 231) !important; z-index: 1001; box-sizing: border-box;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); color: white;
     `;
     
-    // Clear to ensure correct order if re-initialized
     header.innerHTML = '';
 
-    // Icons Sequence: Back, Pin, Edit, Unsend, Delete
-    const icons = ['Back Icon.png', 'Pin Icon.png', 'Edit Icon.png', 'Unsend Icon.png', 'Delete Icon.png'];
-    const ids = ['selBackBtn', 'selPinBtn', 'selEditBtn', 'selUnsendBtn', 'selDeleteBtn'];
+    const iconStyle = 'cursor: pointer; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px;';
 
-    // 1. Back Button
-    const backBtn = document.createElement('img');
-    backBtn.src = icons[0];
-    backBtn.id = ids[0];
-    backBtn.style.cssText = 'height: 24px; width: 24px; object-fit: contain; cursor: pointer;';
+    const backBtn = document.createElement('div');
+    backBtn.id = 'selBackBtn';
+    backBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px;"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>';
+    backBtn.style.cssText = iconStyle + ' color: white;';
     header.appendChild(backBtn);
 
-    // 2. Counter (New)
+    const counterWrapper = document.createElement('div');
+    counterWrapper.style.cssText = 'display: flex; align-items: center; justify-content: center; width: 40px; height: 40px;';
+
     const counter = document.createElement('span');
     counter.id = 'selCounter';
     counter.innerText = '0';
-    counter.style.cssText = 'font-size: 20px; font-weight: bold; color: black;';
-    header.appendChild(counter);
+    counter.style.cssText = 'font-size: 18px; font-weight: bold; color: white;';
+    counterWrapper.appendChild(counter);
+    header.appendChild(counterWrapper);
 
-    // Add Copy button just after the counter
-    const copyBtn = document.createElement('img');
-    copyBtn.src = 'Copy Icon.png';
+    const copyBtn = document.createElement('div');
     copyBtn.id = 'selCopyBtn';
-    copyBtn.style.cssText = 'height: 24px; width: 24px; object-fit: contain; cursor: pointer;';
+    copyBtn.innerHTML = '<img src="Copy Icon.png" style="height: 24px; width: 24px; object-fit: contain; filter: brightness(0) invert(1); pointer-events: none;">';
+    copyBtn.style.cssText = iconStyle;
     header.appendChild(copyBtn);
 
-    // Add Forward button
-    const forwardBtn = document.createElement('img');
-    forwardBtn.src = 'Forward Icon.png';
+    const forwardBtn = document.createElement('div');
     forwardBtn.id = 'selForwardBtn';
-    forwardBtn.style.cssText = 'height: 24px; width: 24px; object-fit: contain; cursor: pointer;';
+    forwardBtn.innerHTML = '<img src="Forward Icon.png" style="height: 24px; width: 24px; object-fit: contain; filter: brightness(0) invert(1); pointer-events: none;">';
+    forwardBtn.style.cssText = iconStyle;
     header.appendChild(forwardBtn);
 
-    // 3. Action Buttons
-    for (let i = 1; i < icons.length; i++) {
-        const btn = document.createElement('img');
-        btn.src = icons[i];
-        btn.id = ids[i];
-        btn.style.cssText = 'height: 24px; width: 24px; object-fit: contain; cursor: pointer;';
-        header.appendChild(btn);
-    }
+    // Right Group: Three Dots & Dropdown Menu
+    const rightGroup = document.createElement('div');
+    rightGroup.style.cssText = 'display: flex; align-items: center; justify-content: center; position: relative; width: 40px; height: 40px;';
+
+    const threeDotsBtn = document.createElement('div');
+    threeDotsBtn.id = 'selThreeDotsBtn';
+    threeDotsBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px; color: white;"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>';
+    threeDotsBtn.style.cssText = 'cursor: pointer; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;';
+    rightGroup.appendChild(threeDotsBtn);
+
+    const dropdown = document.createElement('div');
+    dropdown.id = 'selDropdown';
+    dropdown.style.cssText = `
+        display: none; position: absolute; top: 40px; right: 0;
+        background: #1E293B; border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px; padding: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        z-index: 2000; flex-direction: column; min-width: 150px;
+    `;
+
+    const createDropBtn = (id, text) => {
+        const b = document.createElement('div');
+        b.id = id;
+        b.innerText = text;
+        b.style.cssText = 'padding: 10px; cursor: pointer; color: white; font-size: 0.95rem; border-radius: 5px; text-align: left;';
+        b.onmouseover = () => b.style.background = 'rgba(255,255,255,0.1)';
+        b.onmouseout = () => b.style.background = 'transparent';
+        b.addEventListener('click', () => dropdown.style.display = 'none');
+        return b;
+    };
+
+    const pinBtn = createDropBtn('selPinBtn', 'Pin Message');
+    const editBtn = createDropBtn('selEditBtn', 'Edit');
+    const unsendBtn = createDropBtn('selUnsendBtn', 'Unsend');
+    const deleteBtn = createDropBtn('selDeleteBtn', 'Delete');
+
+    dropdown.appendChild(pinBtn);
+    dropdown.appendChild(editBtn);
+    dropdown.appendChild(unsendBtn);
+    dropdown.appendChild(deleteBtn);
+
+    rightGroup.appendChild(dropdown);
+    header.appendChild(rightGroup);
+
+    threeDotsBtn.onclick = (e) => {
+        e.stopPropagation();
+        dropdown.style.display = dropdown.style.display === 'flex' ? 'none' : 'flex';
+    };
+
+    document.addEventListener('click', (e) => {
+        if (!rightGroup.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
 
     // Handlers
     backBtn.onclick = exitSelectionMode;
@@ -1374,29 +1483,29 @@ let initialScale = 1;
     nameEl.style.textShadow = '0 0 5px rgba(0,0,0,0.5)';
     header.appendChild(nameEl);
 
+    // 2.5 Center Wrapper: Status/Timer
+    const status = document.getElementById('callStatusText');
+    const timer = document.getElementById('callTimer');
+    let centerWrapper = document.getElementById('callHeaderStatusWrapper');
+    if (!centerWrapper) {
+        centerWrapper = document.createElement('div');
+        centerWrapper.id = 'callHeaderStatusWrapper';
+    }
+    centerWrapper.innerHTML = '';
+    if (status) centerWrapper.appendChild(status);
+    if (timer) centerWrapper.appendChild(timer);
+    header.appendChild(centerWrapper);
+
     // 3. Right: PiP Button (Re-append existing button)
     if (callPipBtn) {
         // Update Icon to SVG
-        callPipBtn.innerHTML = `
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
-                <rect x="12" y="13" width="7" height="6" rx="1" ry="1" fill="rgba(255,255,255,0.2)"></rect>
-            </svg>
-        `;
+        callPipBtn.innerHTML = CALL_ICONS.minimize;
         header.appendChild(callPipBtn);
     }
 
-    // Ensure Center Elements (Status/Timer) are outside header
-    let centerEl = document.getElementById('callHeaderCenter');
-    if (!centerEl) {
-        centerEl = document.createElement('div');
-        centerEl.id = 'callHeaderCenter';
-        overlay.appendChild(centerEl);
-    }
-    const status = document.getElementById('callStatusText');
-    const timer = document.getElementById('callTimer');
-    if (status) centerEl.appendChild(status);
-    if (timer) centerEl.appendChild(timer);
+    // Remove legacy centerEl if exists
+    let legacyCenter = document.getElementById('callHeaderCenter');
+    if (legacyCenter) legacyCenter.remove();
 
     // 2. Create Footer
     let footer = overlay.querySelector('.call-footer');
@@ -1426,7 +1535,7 @@ let initialScale = 1;
     const overlay = document.getElementById('camera-live-overlay');
     if (!overlay) return;
 
-    // 1. Create Header for Top Controls (Flash, Label, Close)
+    // 1. Create Header for Top Controls (Back, Label, Flash)
     let header = overlay.querySelector('.camera-header');
     if (!header) {
         header = document.createElement('div');
@@ -1442,22 +1551,30 @@ let initialScale = 1;
         camLabel.innerText = 'Back Cam';
     }
 
-    // Append in order: Flash (Left), Label (Center - Absolute), Close (Right)
-    if (flashCameraBtn) header.appendChild(flashCameraBtn);
-    header.appendChild(camLabel);
-    if (closeCameraBtn) header.appendChild(closeCameraBtn);
+    if (closeCameraBtn) {
+        closeCameraBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px;"><path d="M20 11H8.8l4.9-4.9L12.3 4.7 5 12l7.3 7.3 1.4-1.4-4.9-4.9H20z"/></svg>';
+    }
 
-    // 2. Create Footer for Bottom Controls (Flip, Capture, Gallery)
+    if (flashCameraBtn) {
+        flashCameraBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M7 2L17 2L13.5 10H17L7 22L10.5 14H7L7 2Z" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round"/></svg>';
+    }
+
+    header.innerHTML = '';
+    if (closeCameraBtn) header.appendChild(closeCameraBtn);
+    header.appendChild(camLabel);
+    if (flashCameraBtn) header.appendChild(flashCameraBtn);
+
+    // 2. Create Footer for Bottom Controls (Flip, Capture, Filter)
     let footer = overlay.querySelector('.camera-footer');
     if (!footer) {
         footer = document.createElement('div');
         footer.className = 'camera-footer';
         overlay.appendChild(footer);
 
-        // Create Filter Button (Right) - Replaces Gallery
+        // Create Filter Button (Right)
         const filterBtn = document.createElement('button');
         filterBtn.id = 'cameraFilterBtn';
-        filterBtn.innerHTML = '🎨';
+        filterBtn.innerHTML = '<svg width="28" height="28" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg"><path d="M250 10 C 118 10, 10 118, 10 250 C 10 382, 118 490, 250 490 V 10 Z" fill="#ffdf4a"/><path d="M250 10 C 382 10, 490 118, 490 250 C 490 316, 464 376, 421 421 C 400 400, 360 380, 310 380 C 260 380, 250 420, 250 420 V 10 Z" fill="#fca121"/><path d="M421 421 C 421 421, 400 400, 310 400 C 220 400, 250 490, 250 490 H 250 V 420 C 250 420, 260 380, 310 380 C 360 380, 400 400, 421 421 Z" fill="#fca121" opacity="0.3"/><circle cx="130" cy="160" r="45" fill="#a4d13e"/><circle cx="250" cy="100" r="45" fill="#9376e1"/><circle cx="370" cy="160" r="45" fill="#e23326"/><circle cx="110" cy="300" r="60" fill="#3864b4"/><circle cx="235" cy="385" r="60" fill="#ffffff"/></svg>';
         filterBtn.onclick = () => {
             const video = document.getElementById('cameraVideo');
             let fIdx = parseInt(video.dataset.filterIndex || '0');
@@ -1467,8 +1584,10 @@ let initialScale = 1;
             video.style.filter = filters[fIdx];
         };
         
-        // Move Buttons to Footer in order: Left (Flip), Center (Capture), Right (Filter)
-        if (flipCameraBtn) footer.appendChild(flipCameraBtn);
+        if (flipCameraBtn) {
+            flipCameraBtn.innerHTML = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" style="width: 28px; height: 28px;"><path d="M12 4.5 C9 4.5 6.8 6.1 6 8.8H4.2 L7.6 12.2 L11 8.8H8.8 C9.4 7.4 10.5 6.7 12 6.7 C14.2 6.7 15.8 7.8 16.5 9.8 L18.6 9 C17.6 6.1 15.3 4.5 12 4.5Z"/><path d="M12 19.5 C15 19.5 17.2 17.9 18 15.2H19.8 L16.4 11.8 L13 15.2H15.2 C14.6 16.6 13.5 17.3 12 17.3 C9.8 17.3 8.2 16.2 7.5 14.2 L5.4 15 C6.4 17.9 8.7 19.5 12 19.5Z"/></svg>';
+            footer.appendChild(flipCameraBtn);
+        }
         if (captureCameraBtn) footer.appendChild(captureCameraBtn);
         footer.appendChild(filterBtn);
     }
@@ -1483,45 +1602,33 @@ let initialScale = 1;
         }
         
         .camera-header {
-            position: absolute; top: 0; left: 0; width: 100%; padding: 15px 20px;
-            display: flex; align-items: center; z-index: 10; box-sizing: border-box;
-            background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(5px);
-        }
-
-        body.light-mode .camera-header {
-            background: rgba(255, 255, 255, 0.4);
+            position: absolute; top: 0; left: 0; width: 100%; height: 65px;
+            display: flex; align-items: center; justify-content: space-between; padding: 0 15px;
+            z-index: 10; box-sizing: border-box;
+            background: #0F172A !important;
+            border-bottom: 2px solid rgb(31, 191, 231) !important;
         }
 
         #cameraFacingLabel {
             position: absolute; left: 50%; transform: translateX(-50%);
-            font-size: 1.2rem; font-weight: 600; color: white;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5); pointer-events: none;
+            font-size: 1rem; font-weight: bold; color: white; letter-spacing: 0.5px;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.5); pointer-events: none;
         }
-        body.light-mode #cameraFacingLabel {
-            color: #333; text-shadow: none;
-        }
-
-        #closeCameraBtn { margin-left: auto; }
 
         .camera-footer {
             position: absolute; bottom: 0; left: 0; width: 100%; height: 90px;
             display: flex; align-items: center; justify-content: space-between;
-            padding: 0 30px;
-            background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(10px);
-            z-index: 10; padding-bottom: 10px; box-sizing: border-box;
-        }
-        
-        /* Light Theme Footer */
-        body.light-mode .camera-footer {
-            background: rgba(255, 255, 255, 0.6);
+            padding: 0 30px; z-index: 10; box-sizing: border-box;
+            background: #0F172A !important;
+            border-top: 2px solid rgb(31, 191, 231) !important;
         }
 
         /* General Button Styles */
         .camera-footer button, .camera-header button {
-            width: 50px; height: 50px;
+            width: 45px; height: 45px;
             border-radius: 50%;
-            border: 2px solid #4eb5dbff !important; /* Requested Border Color */
-            background: rgba(0, 0, 0, 0.3);
+            border: none !important;
+            background: transparent !important;
             color: white;
             display: flex; align-items: center; justify-content: center;
             cursor: pointer; outline: none; padding: 0;
@@ -1530,16 +1637,10 @@ let initialScale = 1;
         
         .camera-footer button:active, .camera-header button:active { transform: scale(0.95); }
         
-        /* Light Mode Icons */
-        body.light-mode .camera-footer button, body.light-mode .camera-header button {
-            color: #333;
-            background: rgba(255, 255, 255, 0.3);
-        }
-
         /* Capture Button (Center) */
         #captureCameraBtn {
-            width: 70px; height: 70px;
-            border: 4px solid #4eb5dbff !important;
+            width: 70px !important; height: 70px !important;
+            border: 4px solid #27fb10 !important;
             background: transparent !important;
         }
         #captureCameraBtn::after {
@@ -1547,13 +1648,13 @@ let initialScale = 1;
             width: 55px; height: 55px;
             background: white; border-radius: 50%;
         }
-        #captureCameraBtn img { display: none; } /* Hide icon if any */
-        #captureCameraBtn { font-size: 0; }
 
         /* Filter Button (Right) */
         #cameraFilterBtn {
-            background-color: rgba(0,0,0,0.5) !important;
-            font-size: 20px;
+            background-color: transparent !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         /* Tap to Focus Animation */
@@ -1608,9 +1709,9 @@ let initialScale = 1;
             <img id="pip-profile-pic" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover; position: absolute; display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
         </div>
         <div id="pip-footer" style="display: flex; justify-content: space-around; align-items: center; padding: 8px 5px; background: rgba(0,0,0,0.6);">
-            <button id="pip-speaker-btn" class="pip-control-btn" style="width: 35px; height: 35px; padding: 5px;"><img src="Speaker Icon.png" style="width: 100%; height: 100%; object-fit: contain;"></button>
-            <button id="pip-end-btn" class="pip-control-btn pip-end-call" style="width: 40px; height: 40px; padding: 8px; background: #ff4757; border-radius: 50%;"><img src="Call End Icon.png" style="width: 100%; height: 100%; object-fit: contain;"></button>
-            <button id="pip-mute-btn" class="pip-control-btn" style="width: 35px; height: 35px; padding: 5px;"><img src="Mic Icon.png" style="width: 100%; height: 100%; object-fit: contain;"></button>
+            <button id="pip-speaker-btn" class="pip-control-btn" style="width: 35px; height: 35px; padding: 5px;">${CALL_ICONS.speaker}</button>
+            <button id="pip-end-btn" class="pip-control-btn pip-end-call" style="width: 40px; height: 40px; padding: 8px; background: transparent; border-radius: 50%;">${CALL_ICONS.end}</button>
+            <button id="pip-mute-btn" class="pip-control-btn" style="width: 35px; height: 35px; padding: 5px;">${CALL_ICONS.mic}</button>
         </div>
     `;
     document.body.appendChild(pipView);
@@ -1687,16 +1788,10 @@ let initialScale = 1;
 })();
 
 // --- Dynamic Preview Close Button ---
-(function createPreviewCloseBtn() {
+(function setupPreviewCloseBtn() {
     const overlay = document.getElementById('image-preview-overlay');
-    if (overlay && !document.getElementById('closePreviewBtn')) {
-        const closeBtn = document.createElement('button');
-        closeBtn.id = 'closePreviewBtn';
-        closeBtn.innerHTML = '✖';
-        closeBtn.style.cssText = 'position: absolute; top: 20px; right: 20px; background: rgba(0, 0, 0, 0.5); color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; z-index: 1001; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
-        
-        overlay.appendChild(closeBtn);
-        
+    const closeBtn = document.getElementById('closePreviewBtn');
+    if (overlay && closeBtn) {
         closeBtn.addEventListener('click', () => {
             if (cropper) {
                 cropper.destroy();
@@ -1728,20 +1823,8 @@ let initialScale = 1;
     const overlay = document.getElementById('image-preview-overlay');
     if (!overlay) return;
 
-    // 1. Create/Find Footer
-    let footer = overlay.querySelector('.preview-footer');
-    if (!footer) {
-        footer = document.createElement('div');
-        footer.className = 'preview-footer';
-        overlay.appendChild(footer);
-    }
-
-    // Create Save Button (Download)
     let saveBtn = document.getElementById('saveImageBtn');
-    if (!saveBtn) {
-        saveBtn = document.createElement('button');
-        saveBtn.id = 'saveImageBtn';
-        
+    if (saveBtn) {
         saveBtn.onclick = () => {
             const link = document.createElement('a');
             if (currentImageBase64) {
@@ -1758,33 +1841,10 @@ let initialScale = 1;
             showToast("Saved to Gallery");
         };
     }
-    // Ensure Icon is correct
-    saveBtn.innerHTML = '<img src="Download Icon.png">';
-
-    // Enforce Order: Retake, Crop, Filter, Save, Send
-    if (retakeBtn) footer.appendChild(retakeBtn);
-    if (cropBtn) footer.appendChild(cropBtn);
-    if (filterBtn) footer.appendChild(filterBtn);
-    if (saveBtn) footer.appendChild(saveBtn);
-    if (sendImageBtn) footer.appendChild(sendImageBtn);
-
-    // 2. Update Icons
-    if (retakeBtn) retakeBtn.innerHTML = '<img src="Retake Icon.png">';
-    if (cropBtn) cropBtn.innerHTML = '<img src="Crop Icon.png">';
-    if (filterBtn) filterBtn.innerHTML = '<img src="Filter Icon.png">';
-    if (sendImageBtn) sendImageBtn.innerHTML = '<img src="Send Icon.png">';
     
-    // 3. Inject Styles
+    // Inject Styles
     const style = document.createElement('style');
     style.innerHTML = `
-        .preview-footer {
-            position: absolute; bottom: 0; left: 0; width: 100%;
-            display: flex; align-items: center; justify-content: space-evenly;
-            padding: 50px 0;
-            background: transparent;
-            z-index: 1002;
-            min-height: 40px;
-        }
         .preview-footer button {
             width: 50px; height: 50px;
             border: none !important;
@@ -1796,10 +1856,11 @@ let initialScale = 1;
             flex-shrink: 0;
             margin: 0;
         }
-        .preview-footer button img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+        .preview-footer button svg { width: 28px; height: 28px; pointer-events: none; }
         .preview-footer button:active { transform: scale(0.95); }
         #filterBtn { font-size: 0; }
-        #cropBtn.apply-mode { font-size: 14px !important; font-weight: bold; background: #0ba622ff !important; }
+        #cropBtn.apply-mode { width: auto !important; height: 40px !important; padding: 0 30px !important; border-radius: 20px !important; font-size: 15px !important; font-weight: bold; background: #0EA5E9 !important; color: white !important; }
+        #cropBtn.apply-mode svg { display: none; }
     `;
     document.head.appendChild(style);
 })();
@@ -1952,7 +2013,7 @@ function addSwipeHandler(element, msg) {
         const diff = currentX - startX;
         if (diff > 0) { // Swipe Right
              // Add resistance
-             const move = Math.min(diff, 80);
+             const move = Math.min(diff, 120);
              element.style.transform = `translateX(${move}px)`;
         }
     }, {passive: true});
@@ -1962,7 +2023,7 @@ function addSwipeHandler(element, msg) {
         element.style.transition = 'transform 0.3s ease';
         element.style.transform = 'translateX(0)';
         
-        if (diff > 60) {
+        if (diff > 100) {
             startReply(msg);
             if (navigator.vibrate) navigator.vibrate(30);
         }
@@ -1974,14 +2035,31 @@ function startReply(msg) {
     replyPreview.style.display = 'flex';
     replySender.innerText = msg.sender === currentUser ? 'You' : msg.sender;
     
+    const imageSvg = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 5px; margin-bottom: 2px;"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>';
+    const videoSvg = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 5px; margin-bottom: 2px;"><path d="M17 10.5V7c0-1.1-.9-2-2-2H5C3.9 5 3 5.9 3 7v10c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-3.5l4 4v-11l-4 4z"/></svg>';
+    const audioSvg = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 5px; margin-bottom: 2px;"><path d="M6.6 10.8c1.6 3.1 3.5 5 6.6 6.6l2.2-2.2c.3-.3.8-.4 1.2-.3 1 .3 2 .4 3 .4.7 0 1.2.5 1.2 1.2V21c0 .7-.5 1.2-1.2 1.2C10.4 22.2 1.8 13.6 1.8 3.2 1.8 2.5 2.3 2 3 2h4.5c.7 0 1.2.5 1.2 1.2 0 1 .1 2 .4 3 .1.4 0 .9-.3 1.2l-2.2 2.4z"/></svg>';
+    const fileSvg = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 5px; margin-bottom: 2px;"><path d="M6 2c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6H6zm7 7V3.5L18.5 9H13z"/></svg>';
+
     let displayText = msg.text;
+    let isMissedCall = false;
+
     if (!displayText) {
-        if (msg.image) displayText = '📷 Image';
-        else if (msg.video) displayText = '🎥 Video';
-        else if (msg.audio) displayText = '🎤 Audio';
-        else if (msg.file) displayText = '📄 File';
+        if (msg.image) displayText = imageSvg + ' Image';
+        else if (msg.video) displayText = videoSvg + ' Video';
+        else if (msg.audio) displayText = audioSvg + ' Audio';
+        else if (msg.file) displayText = fileSvg + ' File';
+    } else {
+        displayText = displayText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        if (displayText.includes("Missed Video Call") || displayText.includes("Missed Audio Call")) {
+            isMissedCall = true;
+        }
+        displayText = displayText.replace('📹', videoSvg).replace('📞', audioSvg);
+        
+        if (isMissedCall) {
+            displayText = `<span style="color: #ff4757; font-weight: bold;">${displayText}</span>`;
+        }
     }
-    replyText.innerText = displayText;
+    replyText.innerHTML = displayText;
     msgInput.focus();
 }
 
@@ -2055,6 +2133,10 @@ function filterAndRenderChat() {
 
     let history = allMessagesRaw.filter(msg => {
         if (!msg || typeof msg !== 'object' || !msg.timestamp) return false;
+        
+        // Filter out messages soft-deleted by the current user
+        if (msg[`deletedBy_${currentUser}`]) return false;
+
         if (msg.recipient === currentUser && blockedUsersSet.has(msg.sender)) return false;
         const p1 = msg.sender === currentUser && msg.recipient === currentChatPartner;
         const p2 = msg.sender === currentChatPartner && msg.recipient === currentUser;
@@ -2296,9 +2378,28 @@ function renderChat(history) {
         if (msg.replyTo) {
             const replyDiv = document.createElement('div');
             replyDiv.className = 'replied-msg-context';
+            
+            let repliedTextContent = msg.replyTo.text;
+            let isMissedCall = false;
+            
+            repliedTextContent = repliedTextContent.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            if (repliedTextContent.includes("Missed Video Call") || repliedTextContent.includes("Missed Audio Call")) {
+                isMissedCall = true;
+            }
+
+            const videoSvgText = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 3px; margin-bottom: 2px;"><path d="M17 10.5V7c0-1.1-.9-2-2-2H5C3.9 5 3 5.9 3 7v10c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-3.5l4 4v-11l-4 4z"/></svg>';
+            const audioSvgText = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 3px; margin-bottom: 2px;"><path d="M6.6 10.8c1.6 3.1 3.5 5 6.6 6.6l2.2-2.2c.3-.3.8-.4 1.2-.3 1 .3 2 .4 3 .4.7 0 1.2.5 1.2 1.2V21c0 .7-.5 1.2-1.2 1.2C10.4 22.2 1.8 13.6 1.8 3.2 1.8 2.5 2.3 2 3 2h4.5c.7 0 1.2.5 1.2 1.2 0 1 .1 2 .4 3 .1.4 0 .9-.3 1.2l-2.2 2.4z"/></svg>';
+            const imageSvgText = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 3px; margin-bottom: 2px;"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>';
+            const fileSvgText = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 3px; margin-bottom: 2px;"><path d="M6 2c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6H6zm7 7V3.5L18.5 9H13z"/></svg>';
+            
+            repliedTextContent = repliedTextContent.replace('📹', videoSvgText).replace('📞', audioSvgText).replace('📷', imageSvgText).replace('📄', fileSvgText);
+            if (isMissedCall) {
+                repliedTextContent = `<span style="color: #ff4757; font-weight: bold;">${repliedTextContent}</span>`;
+            }
+
             replyDiv.innerHTML = `
                 <span class="replied-sender">${msg.replyTo.sender === currentUser ? 'You' : msg.replyTo.sender}</span>
-                <span class="replied-text">${msg.replyTo.text}</span>
+                <span class="replied-text">${repliedTextContent}</span>
             `;
             
             replyDiv.addEventListener('click', (e) => {
@@ -2325,6 +2426,7 @@ function renderChat(history) {
             const img = document.createElement('img');
             img.src = msg.image;
             img.className = 'msg-image';
+            img.dataset.msgId = msg.id; // Added for viewer sync
             msgDiv.appendChild(img);
         }
         
@@ -2351,11 +2453,88 @@ function renderChat(history) {
         
         // Render Audio if exists
         if (msg.audio) {
-            const audio = document.createElement('audio');
-            audio.src = msg.audio;
-            audio.controls = true;
-            audio.className = 'msg-audio';
-            msgDiv.appendChild(audio);
+            const audioWrapper = document.createElement('div');
+            audioWrapper.className = 'voice-message-bubble';
+            
+            const controls = document.createElement('div');
+            controls.className = 'cvm-controls';
+            
+            const playBtn = document.createElement('button');
+            playBtn.className = 'cvm-play-btn';
+            const playIcon = document.createElement('div');
+            playIcon.className = 'cvm-play-icon';
+            playBtn.appendChild(playIcon);
+            
+            const waveform = document.createElement('div');
+            waveform.className = 'cvm-waveform';
+            const heights = [6, 12, 10, 22, 16, 8, 14, 26, 12, 8, 20, 10, 6];
+            for (let i = 0; i < heights.length; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'cvm-bar';
+                bar.style.height = `${heights[i]}px`;
+                bar.style.animationDelay = `${i * 0.05}s`;
+                waveform.appendChild(bar);
+            }
+            
+            const timerDisplay = document.createElement('div');
+            timerDisplay.className = 'cvm-timer';
+            timerDisplay.innerText = '0:00';
+            
+            const speakerBtn = document.createElement('button');
+            speakerBtn.className = 'cvm-speaker-btn';
+            speakerBtn.innerHTML = `<svg class="cvm-speaker-icon" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path></svg>`;
+            
+            controls.appendChild(playBtn);
+            controls.appendChild(waveform);
+            controls.appendChild(timerDisplay);
+            controls.appendChild(speakerBtn);
+            audioWrapper.appendChild(controls);
+
+            const actualAudio = document.createElement('audio');
+            actualAudio.src = msg.audio;
+            actualAudio.style.display = 'none';
+            audioWrapper.appendChild(actualAudio);
+            
+            msgDiv.appendChild(audioWrapper);
+
+            const formatTime = (time) => {
+                if (isNaN(time) || !isFinite(time)) return '0:00';
+                const m = Math.floor(time / 60);
+                const s = Math.floor(time % 60).toString().padStart(2, '0');
+                return `${m}:${s}`;
+            };
+
+            actualAudio.addEventListener('loadedmetadata', () => {
+                if (isFinite(actualAudio.duration)) timerDisplay.innerText = formatTime(actualAudio.duration);
+            });
+
+            actualAudio.addEventListener('timeupdate', () => {
+                timerDisplay.innerText = formatTime(actualAudio.currentTime);
+            });
+
+            actualAudio.addEventListener('ended', () => {
+                audioWrapper.classList.remove('playing');
+                if (isFinite(actualAudio.duration)) timerDisplay.innerText = formatTime(actualAudio.duration);
+                else timerDisplay.innerText = '0:00';
+            });
+
+            playBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (actualAudio.paused) {
+                    document.querySelectorAll('audio').forEach(a => {
+                        if (a !== actualAudio && !a.paused) {
+                            a.pause();
+                            a.currentTime = 0;
+                            if (a.parentElement && a.parentElement.classList) a.parentElement.classList.remove('playing');
+                        }
+                    });
+                    actualAudio.play();
+                    audioWrapper.classList.add('playing');
+                } else {
+                    actualAudio.pause();
+                    audioWrapper.classList.remove('playing');
+                }
+            });
         }
         
         // Render File if exists
@@ -2376,6 +2555,12 @@ function renderChat(history) {
 
         if (msg.text) {
             const textSpan = document.createElement('span');
+            
+            if (msg.text === "📹 Missed Video Call" || msg.text === "📞 Missed Audio Call") {
+                textSpan.style.color = '#ff4757';
+                textSpan.style.fontWeight = 'bold';
+            }
+            
             // Escape HTML to prevent XSS
             const escapedText = msg.text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
             // Linkify URLs
@@ -2617,6 +2802,8 @@ acceptBtn.addEventListener('click', async (e) => {
 
             currentChatPartner = ALPHA_ADMIN;
             chatInputBar.style.display = 'flex';
+            
+            if (typeof headerLogoutBtn !== 'undefined' && headerLogoutBtn) headerLogoutBtn.style.display = 'flex';
         }
         
         updatePinnedMessageListener();
@@ -2945,8 +3132,8 @@ themeToggleBtn.addEventListener('click', () => {
     const bubbleColor = isLight ? 'rgba(0, 123, 255, 0.85)' : 'rgba(45, 52, 54, 0.9)';
     msgStyle.innerHTML = `.message-bubble { max-width: 75%; word-wrap: break-word; padding: 10px; border-radius: 10px; margin-bottom: 5px; } .msg-sent { align-self: flex-end; margin-left: auto; text-align: left; background-color: ${bubbleColor} !important; color: white !important; border-bottom-right-radius: 0; } .msg-received { align-self: flex-start; margin-right: auto; text-align: left; background-color: ${bubbleColor} !important; color: white !important; border-bottom-left-radius: 0; } #chatMessages .message-bubble.msg-selected, #chatMessages .msg-sent.msg-selected, #chatMessages .msg-received.msg-selected { background: #ff9f43 !important; transition: background 0.2s; }`;
 
-    const bubbleBgSent = isLight ? 'rgba(210, 235, 255, 0.95)' : 'rgba(45, 52, 54, 0.9)';
-    const bubbleBgRcv = isLight ? 'rgba(240, 240, 245, 0.95)' : 'rgba(45, 52, 54, 0.9)';
+    const bubbleBgSent = isLight ? '#d9fdd3' : '#005c4b';
+    const bubbleBgRcv = isLight ? '#ffffff' : '#202c33';
     const textColor = isLight ? '#000000' : 'white';
     msgStyle.innerHTML = `.message-bubble { max-width: 75%; word-wrap: break-word; padding: 10px; border-radius: 10px; margin-bottom: 5px; } .msg-sent { align-self: flex-end; margin-left: auto; text-align: left; background-color: ${bubbleBgSent} !important; color: ${textColor} !important; border-bottom-right-radius: 0; } .msg-received { align-self: flex-start; margin-right: auto; text-align: left; background-color: ${bubbleBgRcv} !important; color: ${textColor} !important; border-bottom-left-radius: 0; } #chatMessages .message-bubble.msg-selected, #chatMessages .msg-sent.msg-selected, #chatMessages .msg-received.msg-selected { background: #ff9f43 !important; color: white !important; transition: background 0.2s; }`;
 
@@ -2964,10 +3151,10 @@ themeToggleBtn.addEventListener('click', () => {
         bgOverlay.style.backgroundImage = 'none';
         if (isLight) {
             bgImage.style.display = 'none';
-            bgOverlay.style.backgroundColor = '#ffffff';
+            bgOverlay.style.backgroundColor = '#efeae2';
         } else {
             bgImage.style.display = 'none';
-            bgOverlay.style.backgroundColor = '#161B16';
+        bgOverlay.style.backgroundColor = '#0b141a';
         }
     }
 });
@@ -2986,7 +3173,15 @@ confirmClearChat.addEventListener('click', () => {
         currentChatHistory.forEach(msg => {
             if (msg.id) {
                 const table = msg._tableName || getMessageTable(msg.sender);
-                updates[`messages/${table}/${msg.id}`] = null;
+                        const path = `messages/${table}/${msg.id}`;
+                        
+                        if (currentUser === ALPHA_ADMIN) {
+                            // Alpha clears permanently
+                            updates[path] = null;
+                        } else {
+                            // Others only hide for themselves
+                            updates[`${path}/deletedBy_${currentUser}`] = true;
+                        }
             }
         });
         // Also clear pinned message for this chat
@@ -3035,6 +3230,20 @@ if (exportChatBtn) {
 
         showToast("Generating PDF... Please wait.");
         
+        // Re-filter history locally to ensure all messages are captured
+        const exportHistory = allMessagesRaw.filter(msg => {
+            if (!msg || !msg.timestamp) return false;
+            
+            // Respect deletions even in export
+            if (msg[`deletedBy_${currentUser}`]) return false;
+
+            const u1 = String(msg.sender).trim();
+            const u2 = String(msg.recipient).trim();
+            const c1 = String(currentUser).trim();
+            const c2 = String(currentChatPartner).trim();
+            return (u1 === c1 && u2 === c2) || (u1 === c2 && u2 === c1);
+        }).sort((a, b) => (a.rawDate || "") < (b.rawDate || "") ? -1 : 1);
+
         try {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'pt', 'a4');
@@ -3060,102 +3269,79 @@ if (exportChatBtn) {
             const alphaPicBase64 = await getBase64ImageFromUrl(alphaPicUrl);
             const partnerPicBase64 = await getBase64ImageFromUrl(partnerPicUrl);
 
-            function drawBackgroundAndHeader() {
-                // Background
-                doc.setFillColor(252, 252, 252);
-                doc.rect(0, 0, pageWidth, pageHeight, 'F');
-
-                // Border
+            const renderAesthetics = (pageNumber) => {
+                // 2. Page Border
                 doc.setDrawColor(44, 62, 80);
-                doc.setLineWidth(2);
+                doc.setLineWidth(1.5);
                 doc.rect(20, 20, pageWidth - 40, pageHeight - 40);
 
-                // Watermark
-                doc.setTextColor(230, 230, 230);
-                doc.setFontSize(45);
-                doc.setFont("helvetica", "bold");
-                doc.text(`Alpha - ${partnerName} Chatting`, pageWidth / 2, pageHeight / 2, { angle: 45, align: "center" });
+                // 3. Header Logos
+                if (alphaPicBase64) try { doc.addImage(alphaPicBase64, 'JPEG', 40, 40, 45, 45); } catch(e){}
+                if (partnerPicBase64) try { doc.addImage(partnerPicBase64, 'JPEG', pageWidth - 85, 40, 45, 45); } catch(e){}
 
-                // Header Images
-                if (alphaPicBase64) {
-                    try { doc.addImage(alphaPicBase64, 30, 30, 40, 40); } catch(e){}
-                }
-                if (partnerPicBase64) {
-                    try { doc.addImage(partnerPicBase64, pageWidth - 70, 30, 40, 40); } catch(e){}
-                }
-
-                // Header Text
+                // 4. Ministry Branding Text
                 doc.setTextColor(44, 62, 80);
-                doc.setFontSize(16);
-                doc.text(`Alpha - ${partnerName} Chat History`, pageWidth / 2, 55, { align: "center" });
-                
-                // Divider line
-                doc.setDrawColor(200, 200, 200);
-                doc.setLineWidth(1);
-                doc.line(30, 85, pageWidth - 30, 85);
-            }
-
-            let y = 110;
-            drawBackgroundAndHeader();
-
-            let lastDate = "";
-
-            for (let i = 0; i < currentChatHistory.length; i++) {
-                const msg = currentChatHistory[i];
-                
-                let msgDateObj = msg.rawDate ? new Date(msg.rawDate) : new Date();
-                const dateString = getFormattedDate(msgDateObj);
-                
-                if (dateString !== lastDate) {
-                    if (y > pageHeight - 60) { doc.addPage(); drawBackgroundAndHeader(); y = 110; }
-                    doc.setFont("helvetica", "bold");
-                    doc.setFontSize(10);
-                    doc.setTextColor(120, 120, 120);
-                    doc.text(`--- ${dateString} ---`, pageWidth / 2, y, { align: "center" });
-                    y += 20;
-                    lastDate = dateString;
-                }
-
-                if (y > pageHeight - 60) { doc.addPage(); drawBackgroundAndHeader(); y = 110; }
-
-                const isAlpha = msg.sender === currentUser;
-                const senderName = isAlpha ? "Alpha" : partnerName;
-                
                 doc.setFont("helvetica", "bold");
-                doc.setFontSize(10);
-                if (isAlpha) doc.setTextColor(41, 128, 185); // Blue for Alpha
-                else doc.setTextColor(39, 174, 96); // Green for Partner
-                
-                let timeStr = msg.timestamp || "";
-                if (timeStr.includes(' ')) timeStr = timeStr.split(' ').slice(1).join(' ');
-
-                doc.text(`${senderName} [${timeStr}]:`, 40, y);
-                y += 14;
-
+                doc.setFontSize(16);
+                doc.text("MINISTRY OF DEFENCE", pageWidth / 2, 55, { align: "center" });
+                doc.setFontSize(9);
                 doc.setFont("helvetica", "normal");
-                doc.setTextColor(60, 60, 60);
-                
-                let textContent = msg.text || "";
-                if (msg.image) textContent += " [Image Attached]";
-                if (msg.video) textContent += " [Video Attached]";
-                if (msg.audio) textContent += " [Audio Attached]";
-                if (msg.file) textContent += ` [File: ${msg.file.name}]`;
-                
-                const lines = doc.splitTextToSize(textContent, pageWidth - 80);
-                
-                for (let j = 0; j < lines.length; j++) {
-                    if (y > pageHeight - 50) {
-                        doc.addPage();
-                        drawBackgroundAndHeader();
-                        y = 110;
-                    }
-                    doc.text(lines[j], 40, y);
-                    y += 14;
-                }
-                y += 8; // Spacer between messages
-            }
+                doc.text(`Alpha - ${partnerName} Communication`, pageWidth / 2, 70, { align: "center" });
 
-            doc.save(`ChatHistory_Alpha_${partnerName}.pdf`);
+                doc.setDrawColor(200, 200, 200);
+                doc.line(40, 95, pageWidth - 40, 95);
+
+                // 5. Page Numbers
+                doc.setFontSize(8);
+                doc.setTextColor(150);
+                doc.text(`Page ${pageNumber}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+            };
+
+            const head = [['Sender', 'Receiver', 'Send Date & Time', 'Received Date & Time', 'Message']];
+            const bodyData = exportHistory.map(msg => {
+                const senderLabel = msg.sender === ALPHA_ADMIN ? "Alpha" : partnerName;
+                const receiverLabel = msg.recipient === ALPHA_ADMIN ? "Alpha" : partnerName;
+                let content = msg.text || "";
+                if (msg.image) content += " [IMAGE]";
+                if (msg.video) content += " [VIDEO]";
+                if (msg.audio) content += " [AUDIO]";
+                if (msg.file) content += ` [FILE: ${msg.file.name}]`;
+                return [senderLabel, receiverLabel, msg.timestamp || 'N/A', msg.seenTimestamp || 'Unread', content];
+            });
+
+            doc.autoTable({
+                head: head,
+                body: bodyData,
+                startY: 110,
+                theme: 'grid',
+                headStyles: { fillColor: [44, 62, 80], textColor: [255, 255, 255] },
+                bodyStyles: { textColor: [0, 0, 0], fillColor: false }, 
+                styles: { fontSize: 9, cellPadding: 5 },
+                margin: { top: 110 }, // Ensures table starts below header on all pages
+                columnStyles: { 4: { cellWidth: 'auto' } },
+                didParseCell: (data) => {
+                    if (data.section === 'body') {
+                        // Ensure row background is transparent for watermark visibility
+                        data.cell.styles.fillColor = false;
+                        // All text defaults to black
+                        data.cell.styles.textColor = [0, 0, 0];
+                        
+                        if (data.column.index === 4) {
+                            const sender = data.row.cells[0].raw;
+                            if (sender === "Alpha") {
+                                data.cell.styles.textColor = [0, 0, 255]; // Blue for sended
+                            } else {
+                                data.cell.styles.textColor = [0, 128, 0]; // Green for received
+                            }
+                        }
+                    }
+                },
+                didDrawPage: (data) => {
+                    renderAesthetics(data.pageNumber);
+                }
+            });
+
+            doc.save(`Log_Alpha_${partnerName}_${Date.now()}.pdf`);
             showToast("Chat exported successfully!");
         } catch (err) {
             console.error("PDF Generation Error:", err);
@@ -3194,13 +3380,6 @@ pinMsgBtn.addEventListener('click', () => {
     closeOptionsModal();
 });
 
-unpinBtn.addEventListener('click', () => {
-    if (currentUser && currentChatPartner) {
-        const chatId = getChatId(currentUser, currentChatPartner);
-        db.ref(`pinned_messages/${chatId}`).remove();
-    }
-});
-
 let currentPinnedRef = null;
 function updatePinnedMessageListener() {
     if (currentPinnedRef) {
@@ -3223,36 +3402,163 @@ function renderPinnedMessage(pinnedMsg) {
         // Adjust chat padding so messages don't overlap (Header 65px + Pinned Bar ~50px)
         if (chatMessages) chatMessages.style.paddingTop = '125px';
         
-        pinnedSender.innerText = pinnedMsg.sender === currentUser ? 'You' : pinnedMsg.sender;
-        
-        let displayText = pinnedMsg.text;
-        if (!displayText) {
-            if (pinnedMsg.image) displayText = '📷 Image';
-            else if (pinnedMsg.video) displayText = '🎥 Video';
-            else if (pinnedMsg.audio) displayText = '🎤 Audio Message';
-            else if (pinnedMsg.file) displayText = '📄 File';
-            else displayText = 'Message';
-        }
-        pinnedText.innerText = displayText;
+        const imageSvg = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 5px; margin-bottom: 2px;"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>';
+        const videoSvg = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 5px; margin-bottom: 2px;"><path d="M17 10.5V7c0-1.1-.9-2-2-2H5C3.9 5 3 5.9 3 7v10c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-3.5l4 4v-11l-4 4z"/></svg>';
+        const audioSvg = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 5px; margin-bottom: 2px;"><path d="M6.6 10.8c1.6 3.1 3.5 5 6.6 6.6l2.2-2.2c.3-.3.8-.4 1.2-.3 1 .3 2 .4 3 .4.7 0 1.2.5 1.2 1.2V21c0 .7-.5 1.2-1.2 1.2C10.4 22.2 1.8 13.6 1.8 3.2 1.8 2.5 2.3 2 3 2h4.5c.7 0 1.2.5 1.2 1.2 0 1 .1 2 .4 3 .1.4 0 .9-.3 1.2l-2.2 2.4z"/></svg>';
+        const fileSvg = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 5px; margin-bottom: 2px;"><path d="M6 2c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6H6zm7 7V3.5L18.5 9H13z"/></svg>';
 
-        // Scroll to message on click
-        pinnedMessageBar.onclick = (e) => {
-            if (e.target.closest('#unpinBtn')) return;
-            const el = document.getElementById('msg-' + pinnedMsg.id);
-            if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                el.classList.remove('msg-highlight');
-                void el.offsetWidth;
-                el.classList.add('msg-highlight');
-                setTimeout(() => el.classList.remove('msg-highlight'), 1500);
+        let displayText = pinnedMsg.text;
+        let isMissedCall = false;
+
+        if (!displayText) {
+            if (pinnedMsg.image) displayText = imageSvg + ' Image';
+            else if (pinnedMsg.video) displayText = videoSvg + ' Video';
+            else if (pinnedMsg.audio) displayText = audioSvg + ' Audio Message';
+            else if (pinnedMsg.file) displayText = fileSvg + ' File';
+            else displayText = 'Message';
+        } else {
+            displayText = displayText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            if (displayText.includes("Missed Video Call") || displayText.includes("Missed Audio Call")) {
+                isMissedCall = true;
+            }
+            
+            if (isMissedCall) {
+                displayText = displayText.replace('📹', videoSvg.replace('currentColor', '#ff4757')).replace('📞', audioSvg.replace('currentColor', '#ff4757'));
             } else {
-                showToast("Message not found");
+                displayText = displayText.replace('📹', videoSvg).replace('📞', audioSvg);
+            }
+        }
+        
+        pinnedText.innerHTML = displayText;
+
+        let unpinModal = document.getElementById('unpin-msg-modal');
+        if (!unpinModal) {
+            unpinModal = document.createElement('div');
+            unpinModal.id = 'unpin-msg-modal';
+            unpinModal.className = 'modal-overlay';
+            unpinModal.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
+            unpinModal.innerHTML = `
+                <div class="modal-box" style="background: #1E293B; padding: 15px; border-radius: 10px; width: 80%; max-width: 250px; border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; gap: 5px;">
+                    <button id="unpinActionBtn" style="padding: 15px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: white; font-size: 1rem; text-align: center; cursor: pointer; font-weight: bold;">Unpin Message</button>
+                    <button id="cancelUnpinBtn" style="padding: 15px; background: transparent; border: none; color: gray; font-size: 1rem; text-align: center; cursor: pointer;">Cancel</button>
+                </div>
+            `;
+            document.body.appendChild(unpinModal);
+            
+            document.getElementById('cancelUnpinBtn').onclick = () => {
+                unpinModal.style.display = 'none';
+            };
+        }
+
+        let pressTimer;
+        let isLongPress = false;
+        let startX = 0;
+        let currentX = 0;
+        let isSwiping = false;
+        
+        const startPress = (e) => {
+            isLongPress = false;
+            isSwiping = false;
+            startX = e.touches ? e.touches[0].clientX : e.clientX;
+            currentX = startX;
+            pinnedMessageBar.style.transition = 'none';
+            
+            pressTimer = setTimeout(() => {
+                if (!isSwiping) {
+                    isLongPress = true;
+                    unpinModal.style.display = 'flex';
+                    document.getElementById('unpinActionBtn').onclick = () => {
+                        if (currentUser && currentChatPartner) {
+                            const chatId = getChatId(currentUser, currentChatPartner);
+                            db.ref(`pinned_messages/${chatId}`).remove();
+                        }
+                        unpinModal.style.display = 'none';
+                    };
+                    if (navigator.vibrate) navigator.vibrate(30);
+                }
+            }, 600);
+        };
+        
+        const movePress = (e) => {
+            if (!startX) return;
+            currentX = e.touches ? e.touches[0].clientX : e.clientX;
+            const diff = currentX - startX;
+            
+            if (Math.abs(diff) > 10) {
+                isSwiping = true;
+                clearTimeout(pressTimer);
+                pinnedMessageBar.style.transform = `translateX(${diff}px)`;
+                pinnedMessageBar.style.opacity = 1 - (Math.abs(diff) / window.innerWidth);
             }
         };
-        pinnedMessageBar.style.cursor = 'pointer';
+        
+        const cancelPress = () => { 
+            clearTimeout(pressTimer);
+            if (isSwiping) {
+                pinnedMessageBar.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+                pinnedMessageBar.style.transform = 'translateX(0)';
+                pinnedMessageBar.style.opacity = 1;
+                isSwiping = false;
+            }
+            startX = 0;
+        };
+        
+        const endPress = (e) => {
+            clearTimeout(pressTimer);
+            if (isSwiping) {
+                const diff = currentX - startX;
+                if (Math.abs(diff) > 100) {
+                    pinnedMessageBar.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+                    pinnedMessageBar.style.transform = 'translateX(0)';
+                    pinnedMessageBar.style.opacity = 1;
+                    
+                    unpinModal.style.display = 'flex';
+                    document.getElementById('unpinActionBtn').onclick = () => {
+                        if (currentUser && currentChatPartner) {
+                            const chatId = getChatId(currentUser, currentChatPartner);
+                            db.ref(`pinned_messages/${chatId}`).remove();
+                        }
+                        unpinModal.style.display = 'none';
+                    };
+                    if (navigator.vibrate) navigator.vibrate(30);
+                } else {
+                    pinnedMessageBar.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+                    pinnedMessageBar.style.transform = 'translateX(0)';
+                    pinnedMessageBar.style.opacity = 1;
+                }
+                setTimeout(() => { isSwiping = false; startX = 0; }, 50);
+            } else if (!isLongPress) {
+                const el = document.getElementById('msg-' + pinnedMsg.id);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.remove('msg-highlight');
+                    void el.offsetWidth;
+                    el.classList.add('msg-highlight');
+                    setTimeout(() => el.classList.remove('msg-highlight'), 1500);
+                } else {
+                    showToast("Message not found");
+                }
+            }
+        };
+
+        pinnedMessageBar.oncontextmenu = (e) => e.preventDefault();
+        pinnedMessageBar.onmousedown = startPress;
+        pinnedMessageBar.ontouchstart = startPress;
+        pinnedMessageBar.onmousemove = movePress;
+        pinnedMessageBar.ontouchmove = movePress;
+        pinnedMessageBar.onmouseup = endPress;
+        pinnedMessageBar.ontouchend = endPress;
+        pinnedMessageBar.onmouseleave = cancelPress;
+
     } else {
         pinnedMessageBar.style.display = 'none';
-        pinnedMessageBar.onclick = null;
+        pinnedMessageBar.onmousedown = null;
+        pinnedMessageBar.ontouchstart = null;
+        pinnedMessageBar.onmousemove = null;
+        pinnedMessageBar.ontouchmove = null;
+        pinnedMessageBar.onmouseup = null;
+        pinnedMessageBar.ontouchend = null;
+        pinnedMessageBar.onmouseleave = null;
         if (chatMessages) chatMessages.style.paddingTop = '70px';
     }
 }
@@ -3265,7 +3571,15 @@ confirmDeleteMsg.addEventListener('click', () => {
         const msg = currentChatHistory.find(m => m.id === id);
         if (msg) {
             const table = msg._tableName || getMessageTable(msg.sender);
-            db.ref(`messages/${table}/${id}`).remove();
+            const path = `messages/${table}/${id}`;
+
+            if (currentUser === ALPHA_ADMIN) {
+                // Alpha user deletes permanently from database
+                db.ref(path).remove();
+            } else {
+                // Other users only mark it as deleted for themselves
+                db.ref(path).update({ [`deletedBy_${currentUser}`]: true });
+            }
             
             // Check if deleted message was pinned
             const chatId = getChatId(currentUser, currentChatPartner);
@@ -3758,12 +4072,8 @@ async function startCameraStream() {
         cameraStream.getTracks().forEach(track => track.stop());
     }
     
-    // Mirror effect for front camera
-    if (currentFacingMode === 'user') {
-        cameraVideo.style.transform = 'scaleX(-1)';
-    } else {
-        cameraVideo.style.transform = 'none';
-    }
+    // Mirror effect: Always mirror the view for a mirror-like experience as requested
+    cameraVideo.style.transform = 'scaleX(-1)';
 
     const label = document.getElementById('cameraFacingLabel');
     if (label) label.innerText = currentFacingMode === 'user' ? 'Front Cam' : 'Back Cam';
@@ -3771,12 +4081,12 @@ async function startCameraStream() {
     try {
         try {
             cameraStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: currentFacingMode }
+                video: { facingMode: currentFacingMode, width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30 } }
             });
         } catch (e) {
-            console.warn("Specific facingMode failed, trying generic video...", e);
+            console.warn("High quality specific facingMode failed, trying best available 4K...", e);
             cameraStream = await navigator.mediaDevices.getUserMedia({
-                video: true
+                video: { width: { ideal: 3840 }, height: { ideal: 2160 } } // Attempt 4K in fallback
             });
         }
 
@@ -3785,9 +4095,14 @@ async function startCameraStream() {
         cameraVideo.setAttribute('autoplay', 'true');
         await cameraVideo.play();
 
-        // Show flash only for back camera
+        // Ensure 1x zoom if supported by the device
         const track = cameraStream.getVideoTracks()[0];
         const caps = track.getCapabilities ? track.getCapabilities() : {};
+        if (caps.zoom) {
+            track.applyConstraints({ advanced: [{ zoom: 1 }] }).catch(err => console.warn("Zoom constraint failed:", err));
+        }
+
+        // Show flash only for back camera
         
         // Check capabilities for torch support to ensure button only shows if working
         if ('torch' in caps) {
@@ -3845,26 +4160,51 @@ function stopCamera() {
 closeCameraBtn.addEventListener('click', stopCamera);
 
 captureCameraBtn.addEventListener('click', () => {
+    const W_d = cameraVideo.clientWidth;
+    const H_d = cameraVideo.clientHeight;
+    const W_s = cameraVideo.videoWidth;
+    const H_s = cameraVideo.videoHeight;
+
+    // object-fit: cover scales the video to cover the container. Find the scale factor.
+    const scale = Math.max(W_d / W_s, H_d / H_s);
+
+    const renderedWidth = W_s * scale;
+    const renderedHeight = H_s * scale;
+
+    // Find offsets due to centering 
+    const offsetX = (renderedWidth - W_d) / 2;
+    const offsetY = (renderedHeight - H_d) / 2;
+
+    // Define the visible area we want to capture (subtract header: 65px and footer: 90px)
+    const visibleY = 65;
+    const visibleHeight = H_d - 65 - 90;
+
+    // Map display pixel coordinates back to the source video dimensions
+    const sx = offsetX / scale;
+    const sy = (offsetY + visibleY) / scale;
+    const sWidth = W_d / scale;
+    const sHeight = visibleHeight / scale;
+
     const canvas = document.createElement('canvas');
-    canvas.width = cameraVideo.videoWidth;
-    canvas.height = cameraVideo.videoHeight;
+    // Create high-res canvas representing ONLY the cropped visible area
+    canvas.width = sWidth; 
+    canvas.height = sHeight;
     const ctx = canvas.getContext('2d');
     
-    // Mirror capture if front camera
-    if (currentFacingMode === 'user') {
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
-    }
+    // Always mirror the capture to match the requested mirror view
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
     
     // Apply Filter from Live View
     const fIdx = parseInt(cameraVideo.dataset.filterIndex || '0');
     const filters = ['none', 'grayscale(100%)', 'sepia(100%)', 'invert(100%)'];
     if (fIdx > 0) ctx.filter = filters[fIdx];
 
-    ctx.drawImage(cameraVideo, 0, 0, canvas.width, canvas.height);
+    // Draw only the cropped portion directly from the video onto the canvas
+    ctx.drawImage(cameraVideo, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
     
     // Get image
-    currentImageBase64 = canvas.toDataURL('image/jpeg');
+    currentImageBase64 = canvas.toDataURL('image/jpeg', 1.0); // Use 1.0 for highest quality
     baseImageForFilter = currentImageBase64;
     currentFilterMode = 0;
     lastImageSource = 'camera';
@@ -3930,12 +4270,12 @@ async function startCall(video, isIncoming = false) {
     // Reset Buttons
     isCallMuted = false;
     isVideoMuted = false;
-    callMuteBtn.innerHTML = '<img src="Mic Icon.png">';
-    callVideoMuteBtn.innerHTML = '<img src="Camera Icon.png">';
+    callMuteBtn.innerHTML = CALL_ICONS.mic;
+    callVideoMuteBtn.innerHTML = CALL_ICONS.video;
     isSpeakerOn = false;
-    callAudioOutputBtn.innerHTML = '<img src="Speaker Icon.png">';
-    callFlipBtn.innerHTML = '<img src="Camera Flip Icon.png">';
-    callEndBtn.innerHTML = '<img src="Call End Icon.png">';
+    callAudioOutputBtn.innerHTML = CALL_ICONS.speaker;
+    callFlipBtn.innerHTML = CALL_ICONS.flip;
+    callEndBtn.innerHTML = CALL_ICONS.end;
     
     callAudioOutputBtn.style.display = 'flex';
 
@@ -3990,7 +4330,7 @@ async function startCall(video, isIncoming = false) {
         
         callStream = await navigator.mediaDevices.getUserMedia(constraints);
         
-        // Force enable tracks
+        // Force enable tracks and set video resolution/framerate
         callStream.getAudioTracks().forEach(t => t.enabled = true);
         
         // Initialize Audio Output (Default to Earpiece)
@@ -3998,8 +4338,15 @@ async function startCall(video, isIncoming = false) {
         
         if (video) {
             callStream.getVideoTracks().forEach(t => t.enabled = true);
+            callStream.getVideoTracks().forEach(t => {
+                t.applyConstraints({ width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30 } });
+            });
             callLocalVideo.srcObject = callStream;
-            callLocalVideo.style.transform = 'scaleX(-1)'; // Mirror local
+            // Mirror videos for user-facing camera to feel like a mirror
+            if (callFacingMode === 'user') {
+                callLocalVideo.style.transform = 'scaleX(-1)';
+                callRemoteVideo.style.transform = 'scaleX(-1)';
+            }
         }
 
         // 3. Initiate Connection if Caller
@@ -4439,7 +4786,7 @@ callMuteBtn.addEventListener('click', (e) => {
         if (track) {
             isCallMuted = !isCallMuted;
             track.enabled = !isCallMuted;
-            callMuteBtn.innerHTML = isCallMuted ? '<img src="Audio Mute Icon.png">' : '<img src="Mic Icon.png">';
+            callMuteBtn.innerHTML = isCallMuted ? CALL_ICONS.micMute : CALL_ICONS.mic;
             syncPipControls();
         }
     }
@@ -4452,7 +4799,7 @@ callVideoMuteBtn.addEventListener('click', (e) => {
         if (track) {
             isVideoMuted = !isVideoMuted;
             track.enabled = !isVideoMuted;
-            callVideoMuteBtn.innerHTML = isVideoMuted ? '<img src="Video Mute Icon.png">' : '<img src="Camera Icon.png">';
+            callVideoMuteBtn.innerHTML = isVideoMuted ? CALL_ICONS.videoMute : CALL_ICONS.video;
         }
     }
 });
@@ -4470,18 +4817,14 @@ function swapVideoFeeds() {
     callLocalVideo.srcObject = remoteVideoSrc;
     callRemoteVideo.srcObject = localVideoSrc;
 
-    // The element showing the local user's front-facing camera should be mirrored.
     // Reset transforms first.
     callLocalVideo.style.transform = 'none';
     callRemoteVideo.style.transform = 'none';
 
-    // Re-apply mirroring to whichever element is now showing the local user's front-facing camera
+    // Re-apply mirroring to both elements if using the front camera
     if (callFacingMode === 'user') {
-        if (callLocalVideo.srcObject === callStream) {
-            callLocalVideo.style.transform = 'scaleX(-1)';
-        } else if (callRemoteVideo.srcObject === callStream) {
-            callRemoteVideo.style.transform = 'scaleX(-1)';
-        }
+        callLocalVideo.style.transform = 'scaleX(-1)';
+        callRemoteVideo.style.transform = 'scaleX(-1)';
     }
 
     // Ensure playback continues
@@ -4494,10 +4837,10 @@ function syncPipControls() {
     const pipSpeakerBtn = document.getElementById('pip-speaker-btn');
 
     if (pipMuteBtn) {
-        pipMuteBtn.innerHTML = isCallMuted ? '<img src="Audio Mute Icon.png" style="width: 100%; height: 100%; object-fit: contain;">' : '<img src="Mic Icon.png" style="width: 100%; height: 100%; object-fit: contain;">';
+        pipMuteBtn.innerHTML = isCallMuted ? CALL_ICONS.micMute : CALL_ICONS.mic;
     }
     if (pipSpeakerBtn) {
-        pipSpeakerBtn.innerHTML = isSpeakerOn ? '<img src="Ear Piece Icon.png" style="width: 100%; height: 100%; object-fit: contain;">' : '<img src="Speaker Icon.png" style="width: 100%; height: 100%; object-fit: contain;">';
+        pipSpeakerBtn.innerHTML = isSpeakerOn ? CALL_ICONS.earpiece : CALL_ICONS.speaker;
     }
 }
 
@@ -4525,8 +4868,8 @@ callFlipBtn.addEventListener('click', async (e) => {
             callLocalVideo.style.transform = 'none';
             callRemoteVideo.style.transform = 'none';
             if (callFacingMode === 'user') {
-                if (callLocalVideo.srcObject === callStream) callLocalVideo.style.transform = 'scaleX(-1)';
-                else if (callRemoteVideo.srcObject === callStream) callRemoteVideo.style.transform = 'scaleX(-1)';
+                callLocalVideo.style.transform = 'scaleX(-1)';
+                callRemoteVideo.style.transform = 'scaleX(-1)';
             }
             
             // Restore Mute State
@@ -4562,7 +4905,7 @@ async function updateAudioOutput(isManual = false) {
         }
         
         await element.setSinkId(targetId);
-        callAudioOutputBtn.innerHTML = isSpeakerOn ? '<img src="Ear Piece Icon.png">' : '<img src="Speaker Icon.png">';
+        callAudioOutputBtn.innerHTML = isSpeakerOn ? CALL_ICONS.earpiece : CALL_ICONS.speaker;
         syncPipControls();
     } catch(e) { console.error(e); }
 }
@@ -4600,6 +4943,9 @@ callPipBtn.addEventListener('click', (e) => {
         if (pipProfilePic) pipProfilePic.style.display = 'none';
         pipVideo.srcObject = callRemoteVideo.srcObject;
         if (pipHeader) pipHeader.innerText = "Video Call";
+        
+        // Maintain mirror effect in PiP if using front camera
+        pipVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1)' : 'none';
     } else {
         pipVideo.style.display = 'none';
         if (pipProfilePic) {
@@ -4667,7 +5013,7 @@ function handleLocalVideoDragMove(e) {
 
     const overlayRect = callOverlay.getBoundingClientRect();
     const videoRect = localVideoDraggable.getBoundingClientRect();
-    const headerHeight = 70;
+    const headerHeight = 65;
     const footerHeight = 80;
 
     newX = Math.max(5, Math.min(newX, overlayRect.width - videoRect.width - 5));
@@ -4714,9 +5060,51 @@ micBtn.addEventListener('click', () => {
     }
 });
 
+let isAudioPaused = false;
+const waveBarCount = 20;
+const waveBarWidth = 3;
+const waveBarSpacing = 3;
+const waveColorsL = ["#e65100", "#ff9800", "#fdd835"]; 
+const waveColorsR = ["#d81b60", "#9c27b0", "#3f51b5"];
+let wavesInitialized = false;
+let smoothedAudioVolume = 0;
+
+function initAudioWaves() {
+    if (wavesInitialized) return;
+    function createBars(svgId, isRight) {
+        const svg = document.getElementById(svgId);
+        if (!svg) return;
+        svg.innerHTML = '';
+        for (let i = 0; i < waveBarCount; i++) {
+            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            const xPos = isRight ? i * (waveBarWidth + waveBarSpacing) : 150 - (i + 1) * (waveBarWidth + waveBarSpacing);
+            rect.setAttribute("x", xPos);
+            rect.setAttribute("width", waveBarWidth);
+            rect.setAttribute("rx", 1.5);
+            rect.style.transition = "height 0.1s ease-out, y 0.1s ease-out";
+            const colorArr = isRight ? waveColorsR : waveColorsL;
+            rect.setAttribute("fill", colorArr[Math.floor((i / waveBarCount) * colorArr.length)]);
+            svg.appendChild(rect);
+        }
+    }
+    createBars("wave-left", false);
+    createBars("wave-right", true);
+    wavesInitialized = true;
+}
+
 function startRecording(stream) {
     audioChunks = [];
     mediaRecorder = new MediaRecorder(stream);
+    isAudioPaused = false;
+    
+    const pauseIcon = document.getElementById('pauseAudioIcon');
+    const resumeIcon = document.getElementById('resumeAudioIcon');
+    const centerMic = document.getElementById('recordCenterMic');
+    if (pauseIcon) pauseIcon.style.display = 'block';
+    if (resumeIcon) resumeIcon.style.display = 'none';
+    if (centerMic) centerMic.style.backgroundColor = '#2ecc71';
+
+    initAudioWaves();
     
     mediaRecorder.ondataavailable = event => {
         audioChunks.push(event.data);
@@ -4741,17 +5129,32 @@ function startRecording(stream) {
     startVisualizer(stream);
     
     // Timer Logic
-    let seconds = 0;
+    totalRecordedSeconds = 0;
     recordingTimer.innerText = "00:00";
     recordingInterval = setInterval(() => {
-        seconds++;
-        const m = String(Math.floor(seconds / 60)).padStart(2, '0');
-        const s = String(seconds % 60).padStart(2, '0');
-        recordingTimer.innerText = `${m}:${s}`;
+        if (!isAudioPaused) {
+            totalRecordedSeconds++;
+            const m = String(Math.floor(totalRecordedSeconds / 60)).padStart(2, '0');
+            const s = String(totalRecordedSeconds % 60).padStart(2, '0');
+            recordingTimer.innerText = `${m}:${s}`;
+        }
     }, 1000);
 }
 
 function stopRecording(sending) {
+    previewAudio.pause();
+    previewAudio.currentTime = 0;
+    previewAudio.ontimeupdate = null;
+    const centerMic = document.getElementById('recordCenterMic');
+    if (centerMic) centerMic.style.opacity = '1';
+
+    [cancelAudioBtn, sendAudioBtn, pauseResumeAudioBtn].forEach(btn => {
+        if (btn) {
+            btn.style.opacity = '1';
+            btn.style.pointerEvents = 'auto';
+        }
+    });
+
     isSendingAudio = sending;
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         mediaRecorder.stop();
@@ -4780,29 +5183,143 @@ function startVisualizer(stream) {
 
 function drawVisualizer() {
     visualizerAnimationId = requestAnimationFrame(drawVisualizer);
-    analyser.getByteFrequencyData(visualizerDataArray);
-    const canvasCtx = audioVisualizer.getContext('2d');
-    const width = audioVisualizer.width;
-    const height = audioVisualizer.height;
-    
-    canvasCtx.clearRect(0, 0, width, height);
-    
-    const barWidth = (width / visualizerDataArray.length) * 0.6;
-    const gap = (width / visualizerDataArray.length) * 0.4;
-    let x = 0;
-    
-    for(let i = 0; i < visualizerDataArray.length; i++) {
-        const barHeight = (visualizerDataArray[i] / 255) * height;
-        
-        canvasCtx.fillStyle = '#ff4757';
-        
-        // Draw centered vertically
-        const y = (height - barHeight) / 2;
-        
-        canvasCtx.fillRect(x, y, barWidth, barHeight);
-        
-        x += barWidth + gap;
+    if (!analyser) return;
+
+    const barsL = document.getElementById("wave-left")?.children;
+    const barsR = document.getElementById("wave-right")?.children;
+    if (!barsL || !barsR || barsL.length === 0) return;
+
+    // When paused, flatten the wave layout
+    if (isAudioPaused) {
+        for (let i = 0; i < waveBarCount; i++) {
+            barsL[i].setAttribute("height", 6);
+            barsL[i].setAttribute("y", 27);
+            barsR[i].setAttribute("height", 6);
+            barsR[i].setAttribute("y", 27);
+        }
+        return;
     }
+
+    analyser.getByteFrequencyData(visualizerDataArray);
+    
+    // Calculate average volume for reactivity
+    let sum = 0;
+    for(let i = 0; i < visualizerDataArray.length; i++) {
+        sum += visualizerDataArray[i];
+    }
+    let avg = sum / visualizerDataArray.length;
+    let targetVolume = avg / 30; // Threshold mapping for natural speech
+    
+    // Smooth out jittery mic input to maintain the fluid wave feel
+    smoothedAudioVolume = smoothedAudioVolume * 0.8 + targetVolume * 0.2;
+    let volumeScale = smoothedAudioVolume;
+    if (volumeScale < 0.1) volumeScale = 0.1;
+    if (volumeScale > 1.2) volumeScale = 1.2;
+
+    const time = Date.now() * 0.008;
+
+    // Update the SVGs using the symmetrical wave math modulated by audio volume
+    for (let i = 0; i < waveBarCount; i++) {
+        let baseNoise = (Math.sin(i * 0.4 - time) + 1) / 2;
+        let noise = baseNoise * volumeScale;
+        
+        if (i < 5 && noise < 0.25) noise = 0.25; // Keeping middle base visibility
+
+        const height = 6 + (noise * 44); 
+        const y = (60 - height) / 2;
+
+        barsL[i].setAttribute("height", height);
+        barsL[i].setAttribute("y", y);
+        barsR[i].setAttribute("height", height);
+        barsR[i].setAttribute("y", y);
+    }
+}
+
+const pauseResumeAudioBtn = document.getElementById('pauseResumeAudioBtn');
+if (pauseResumeAudioBtn) {
+    pauseResumeAudioBtn.addEventListener('click', () => {
+        if (!mediaRecorder) return;
+        const pauseIcon = document.getElementById('pauseAudioIcon');
+        const resumeIcon = document.getElementById('resumeAudioIcon');
+        const centerMic = document.getElementById('recordCenterMic');
+
+        if (mediaRecorder.state === 'recording') {
+            mediaRecorder.requestData(); // Flush current data for preview
+            mediaRecorder.pause();
+            isAudioPaused = true;
+            if(pauseIcon) pauseIcon.style.display = 'none';
+            if(resumeIcon) resumeIcon.style.display = 'block';
+            if(centerMic) centerMic.style.backgroundColor = '#ff4757';
+        } else if (mediaRecorder.state === 'paused') {
+            previewAudio.pause();
+            previewAudio.currentTime = 0;
+            if(centerMic) centerMic.style.opacity = '1';
+
+            mediaRecorder.resume();
+            isAudioPaused = false;
+            if(pauseIcon) pauseIcon.style.display = 'block';
+            if(resumeIcon) resumeIcon.style.display = 'none';
+            if(centerMic) centerMic.style.backgroundColor = '#2ecc71';
+        }
+    });
+}
+
+const centerMicBtn = document.getElementById('recordCenterMic');
+if (centerMicBtn) {
+    function setAudioControlsDisabled(disabled) {
+        [cancelAudioBtn, sendAudioBtn, pauseResumeAudioBtn].forEach(btn => {
+            if (btn) {
+                btn.style.opacity = disabled ? '0.5' : '1';
+                btn.style.pointerEvents = disabled ? 'none' : 'auto';
+            }
+        });
+    }
+    
+    function restoreRecordingTimer() {
+        const m = String(Math.floor(totalRecordedSeconds / 60)).padStart(2, '0');
+        const s = String(totalRecordedSeconds % 60).padStart(2, '0');
+        if (recordingTimer) recordingTimer.innerText = `${m}:${s}`;
+    }
+
+    centerMicBtn.addEventListener('click', () => {
+        if (isAudioPaused && mediaRecorder && mediaRecorder.state === 'paused') {
+            if (!previewAudio.paused && previewAudio.currentTime > 0) {
+                // Stop playback
+                previewAudio.pause();
+                previewAudio.currentTime = 0;
+                previewAudio.ontimeupdate = null;
+                centerMicBtn.style.opacity = '1';
+                
+                setAudioControlsDisabled(false);
+                restoreRecordingTimer();
+            } else {
+                // Start playback
+                const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                previewAudio.src = audioUrl;
+                previewAudio.play();
+                centerMicBtn.style.opacity = '0.5'; // Dim mic while playing
+                
+                setAudioControlsDisabled(true);
+                
+                previewAudio.ontimeupdate = () => {
+                    const currentSecs = Math.floor(previewAudio.currentTime);
+                    const m = String(Math.floor(currentSecs / 60)).padStart(2, '0');
+                    const s = String(currentSecs % 60).padStart(2, '0');
+                    if (recordingTimer) recordingTimer.innerText = `${m}:${s}`;
+                };
+                
+                previewAudio.onended = () => {
+                    centerMicBtn.style.opacity = '1';
+                    URL.revokeObjectURL(audioUrl);
+                    previewAudio.ontimeupdate = null;
+                    
+                    setAudioControlsDisabled(false);
+                    restoreRecordingTimer();
+                };
+            }
+        }
+    });
 }
 
 cancelAudioBtn.addEventListener('click', () => stopRecording(false));
@@ -4992,12 +5509,14 @@ retakeBtn.addEventListener('click', () => {
 });
 
 function resetCropButton() {
-    cropBtn.innerHTML = '<img src="Crop Icon.png">';
+    cropBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 28px; height: 28px;"> <path d="M6.13 1L6 16a2 2 0 0 0 2 2h15" /> <path d="M1 6.13L16 6a2 2 0 0 1 2 2v15" /> </svg>`;
     cropBtn.classList.remove('apply-mode');
     cropBtn.style.background = "";
     filterBtn.style.display = ''; // Show filter button
     sendImageBtn.style.display = 'flex';
     retakeBtn.style.display = '';
+    let saveBtn = document.getElementById('saveImageBtn');
+    if (saveBtn) saveBtn.style.display = '';
 }
 
 cropBtn.addEventListener('click', () => {
@@ -5014,6 +5533,8 @@ cropBtn.addEventListener('click', () => {
         filterBtn.style.display = 'none'; // Hide filter button while cropping
         sendImageBtn.style.display = 'none';
         retakeBtn.style.display = 'none';
+        let saveBtn = document.getElementById('saveImageBtn');
+        if (saveBtn) saveBtn.style.display = 'none';
     } else {
         // Apply Crop
         const canvas = cropper.getCroppedCanvas();
@@ -5111,84 +5632,6 @@ sendImageBtn.addEventListener('click', () => {
     }
 });
 
-// --- Dynamic Image Viewer Header Setup ---
-(function setupImageViewerHeader() {
-    const modal = document.getElementById('image-viewer-modal');
-    if (!modal) return;
-
-    // Create Header Container
-    let header = modal.querySelector('.viewer-header');
-    if (!header) {
-        header = document.createElement('div');
-        header.className = 'viewer-header';
-        header.style.cssText = `
-            position: absolute; top: 0; left: 0; width: 100%; height: 60px;
-            display: flex; align-items: center; justify-content: center; padding: 0 15px;
-            background: rgba(7, 94, 137, 1); z-index: 1002;
-            box-sizing: border-box; gap: 40px;
-        `;
-        modal.prepend(header);
-    }
-    
-    // Clear to ensure correct order
-    header.innerHTML = '';
-
-    const createIconBtn = (src, onClick) => {
-        const btn = document.createElement('button');
-        btn.style.cssText = `
-            background: transparent; border: none; cursor: pointer;
-            width: 30px; height: 30px; padding: 0; display: flex;
-            align-items: center; justify-content: center;
-        `;
-        const img = document.createElement('img');
-        img.src = src;
-        img.style.cssText = 'width: 100%; height: 100%; object-fit: contain; pointer-events: none;';
-        btn.appendChild(img);
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            onClick();
-        });
-        return btn;
-    };
-
-    // 1. Download Icon
-    header.appendChild(createIconBtn('Download Icon.png', () => {
-        downloadViewerMedia('download');
-    }));
-
-    // 2. Share Icon
-    header.appendChild(createIconBtn('Share Icon.png', () => {
-        shareViewerMedia();
-    }));
-
-    // 3. Save Gallery Icon
-    header.appendChild(createIconBtn('Save Gallery Icon.png', () => {
-        downloadViewerMedia('gallery');
-    }));
-
-    // 4. Close Icon
-    header.appendChild(createIconBtn('Close Icon.png', () => {
-        const modal = document.getElementById('image-viewer-modal');
-        if (modal) modal.style.display = 'none';
-        const v = document.getElementById('viewerVideoElement');
-        if(v) {
-            v.pause();
-            v.src = '';
-        }
-        // Reset Zoom
-        if (typeof viewerScale !== 'undefined') {
-            viewerScale = 1;
-            viewerTranslateX = 0;
-            viewerTranslateY = 0;
-            if (typeof updateViewerTransform === 'function') updateViewerTransform();
-        }
-    }));
-
-    // Hide original close button if exists
-    const oldClose = document.getElementById('closeViewerBtn');
-    if (oldClose) oldClose.style.display = 'none';
-})();
-
 function downloadViewerMedia(mode) {
     const img = document.getElementById('viewerImage');
     const video = document.getElementById('viewerVideoElement');
@@ -5258,29 +5701,90 @@ async function shareViewerMedia() {
     }
 }
 
-// --- Image Viewer Logic (Zoom & Pan) ---
+// --- Image Viewer Logic (Zoom, Pan, & Navigation) ---
+
+let currentViewerImages = [];
+let currentViewerIndex = -1;
+
+function openImageViewer(msgId, defaultSrc) {
+    currentViewerImages = currentChatHistory.filter(m => m.image);
+    currentViewerIndex = currentViewerImages.findIndex(m => m.id === msgId);
+
+    imageViewerModal.style.display = 'flex';
+    
+    if (currentViewerIndex !== -1) {
+        updateImageViewer();
+    } else {
+        viewerImage.src = defaultSrc;
+        viewerImage.dataset.msgId = msgId;
+        const prevBtn = document.getElementById('viewerPrevBtn');
+        const nextBtn = document.getElementById('viewerNextBtn');
+        if(prevBtn) { prevBtn.style.opacity = '0.3'; prevBtn.style.pointerEvents = 'none'; }
+        if(nextBtn) { nextBtn.style.opacity = '0.3'; nextBtn.style.pointerEvents = 'none'; }
+    }
+    
+    const editBtn = document.getElementById('viewerEditBtn');
+    if (editBtn) editBtn.style.display = 'flex';
+
+    const prevBtn = document.getElementById('viewerPrevBtn');
+    const nextBtn = document.getElementById('viewerNextBtn');
+    if (prevBtn) prevBtn.style.display = 'flex';
+    if (nextBtn) nextBtn.style.display = 'flex';
+
+    viewerScale = 1;
+    viewerTranslateX = 0;
+    viewerTranslateY = 0;
+    updateViewerTransform();
+    
+    const v = document.getElementById('viewerVideoElement');
+    if(v) {
+        v.style.display = 'none';
+        v.pause();
+    }
+    viewerImage.style.display = 'block';
+}
+
+function updateImageViewer() {
+    if (currentViewerIndex >= 0 && currentViewerIndex < currentViewerImages.length) {
+        const msg = currentViewerImages[currentViewerIndex];
+        viewerImage.src = msg.image;
+        viewerImage.dataset.msgId = msg.id;
+
+        const prevBtn = document.getElementById('viewerPrevBtn');
+        const nextBtn = document.getElementById('viewerNextBtn');
+
+        if (prevBtn) {
+            if (currentViewerIndex > 0) {
+                prevBtn.style.opacity = '1';
+                prevBtn.style.pointerEvents = 'auto';
+            } else {
+                prevBtn.style.opacity = '0.3';
+                prevBtn.style.pointerEvents = 'none';
+            }
+        }
+
+        if (nextBtn) {
+            if (currentViewerIndex < currentViewerImages.length - 1) {
+                nextBtn.style.opacity = '1';
+                nextBtn.style.pointerEvents = 'auto';
+            } else {
+                nextBtn.style.opacity = '0.3';
+                nextBtn.style.pointerEvents = 'none';
+            }
+        }
+    }
+}
 
 // Open Viewer
 chatMessages.addEventListener('click', (e) => {
     if (e.target.classList.contains('msg-image')) {
-        imageViewerModal.style.display = 'block';
-        viewerImage.style.display = 'block';
-        viewerImage.src = e.target.src;
-        // Reset State
-        viewerScale = 1;
-        viewerTranslateX = 0;
-        viewerTranslateY = 0;
-        zoomSlider.value = 1;
-        updateViewerTransform();
-        
-        // Hide video if present
-        const v = document.getElementById('viewerVideoElement');
-        if(v) v.style.display = 'none';
+        const msgId = e.target.dataset.msgId;
+        openImageViewer(msgId, e.target.src);
     }
 });
 
 function openVideoViewer(src) {
-    imageViewerModal.style.display = 'block';
+    imageViewerModal.style.display = 'flex';
     viewerImage.style.display = 'none';
     
     let viewerVideo = document.getElementById('viewerVideoElement');
@@ -5289,22 +5793,123 @@ function openVideoViewer(src) {
         viewerVideo.id = 'viewerVideoElement';
         viewerVideo.controls = true;
         viewerVideo.style.cssText = 'max-width: 100%; max-height: 80vh; display: block; margin: auto;';
-        viewerImage.parentNode.insertBefore(viewerVideo, viewerImage);
+        
+        const container = document.querySelector('.viewer-image-container');
+        container.appendChild(viewerVideo);
     }
     viewerVideo.src = src;
     viewerVideo.style.display = 'block';
     viewerVideo.play();
+
+    const editBtn = document.getElementById('viewerEditBtn');
+    if (editBtn) editBtn.style.display = 'none';
+    
+    const prevBtn = document.getElementById('viewerPrevBtn');
+    const nextBtn = document.getElementById('viewerNextBtn');
+    if (prevBtn) prevBtn.style.display = 'none';
+    if (nextBtn) nextBtn.style.display = 'none';
 }
 
-// Close Viewer
-closeViewerBtn.addEventListener('click', () => {
-    imageViewerModal.style.display = 'none';
-    const v = document.getElementById('viewerVideoElement');
-    if(v) {
-        v.pause();
-        v.src = '';
-    }
-});
+const viewerBackBtn = document.getElementById('viewerBackBtn');
+const viewerDownloadBtn = document.getElementById('viewerDownloadBtn');
+const viewerForwardBtn = document.getElementById('viewerForwardBtn');
+const viewerEditBtn = document.getElementById('viewerEditBtn');
+const viewerShareBtn = document.getElementById('viewerShareBtn');
+const viewerPrevBtn = document.getElementById('viewerPrevBtn');
+const viewerNextBtn = document.getElementById('viewerNextBtn');
+
+if (viewerBackBtn) {
+    viewerBackBtn.addEventListener('click', () => {
+        imageViewerModal.style.display = 'none';
+        const v = document.getElementById('viewerVideoElement');
+        if(v) {
+            v.pause();
+            v.src = '';
+        }
+    });
+}
+
+if (viewerDownloadBtn) {
+    viewerDownloadBtn.addEventListener('click', () => {
+        downloadViewerMedia('download');
+    });
+}
+
+if (viewerForwardBtn) {
+    viewerForwardBtn.addEventListener('click', () => {
+        const msgId = viewerImage.dataset.msgId;
+        if (msgId) {
+            selectedMsgIds.clear();
+            selectedMsgIds.add(msgId);
+            openForwardModal();
+        }
+    });
+}
+
+if (viewerEditBtn) {
+    viewerEditBtn.addEventListener('click', () => {
+        const imgSrc = viewerImage.src;
+        if (imgSrc) {
+            currentImageBase64 = imgSrc;
+            baseImageForFilter = imgSrc;
+            currentFileData = null;
+            currentVideoBase64 = null;
+            currentFilterMode = 0;
+            
+            const previewOverlay = document.getElementById('image-preview-overlay');
+            const previewImg = document.getElementById('previewImage');
+            
+            previewImg.src = imgSrc;
+            previewImg.style.display = 'block';
+            
+            cropBtn.style.display = 'flex';
+            filterBtn.style.display = 'flex';
+            retakeBtn.style.display = 'flex';
+            
+            const info = document.getElementById('file-preview-info');
+            if(info) info.style.display = 'none';
+            
+            const vidPreview = document.getElementById('previewVideo');
+            if(vidPreview) vidPreview.style.display = 'none';
+
+            previewOverlay.style.display = 'flex';
+            
+            imageViewerModal.style.display = 'none';
+        }
+    });
+}
+
+if (viewerShareBtn) {
+    viewerShareBtn.addEventListener('click', () => {
+        shareViewerMedia();
+    });
+}
+
+if (viewerPrevBtn) {
+    viewerPrevBtn.addEventListener('click', () => {
+        if (currentViewerIndex > 0) {
+            currentViewerIndex--;
+            updateImageViewer();
+            viewerScale = 1;
+            viewerTranslateX = 0;
+            viewerTranslateY = 0;
+            updateViewerTransform();
+        }
+    });
+}
+
+if (viewerNextBtn) {
+    viewerNextBtn.addEventListener('click', () => {
+        if (currentViewerIndex < currentViewerImages.length - 1) {
+            currentViewerIndex++;
+            updateImageViewer();
+            viewerScale = 1;
+            viewerTranslateX = 0;
+            viewerTranslateY = 0;
+            updateViewerTransform();
+        }
+    });
+}
 
 // Update Transform
 function updateViewerTransform() {
@@ -5314,14 +5919,7 @@ function updateViewerTransform() {
         viewerTranslateY = 0;
     }
     viewerImage.style.transform = `translate(${viewerTranslateX}px, ${viewerTranslateY}px) scale(${viewerScale})`;
-    zoomSlider.value = viewerScale;
 }
-
-// Slider Zoom
-zoomSlider.addEventListener('input', (e) => {
-    viewerScale = parseFloat(e.target.value);
-    updateViewerTransform();
-});
 
 // Touch Gestures (Pinch to Zoom & Pan)
 viewerImage.addEventListener('touchstart', (e) => {
@@ -5371,23 +5969,24 @@ viewerImage.addEventListener('dblclick', () => {
 
 // Show Logout Confirmation
 logoutBtn.addEventListener('click', () => {
-    menuOptions.style.display = 'none';
-    menuIconBtn.classList.remove('rotate');
-    logoutModal.style.display = 'flex';
-    mainContent.classList.add('blur-content');
+    showLogoutModal();
 });
 
 // Cancel Logout
 cancelLogout.addEventListener('click', () => {
     logoutModal.style.display = 'none';
-    mainContent.classList.remove('blur-content');
+    if (mainContent) mainContent.classList.remove('blur-content');
+    const alphaDash = document.getElementById('alpha-dashboard');
+    if (alphaDash) alphaDash.classList.remove('blur-content');
 });
 
 // Confirm Logout
 confirmLogout.addEventListener('click', () => {
     // Hide Modal & Remove Blur
     logoutModal.style.display = 'none';
-    mainContent.classList.remove('blur-content');
+    if (mainContent) mainContent.classList.remove('blur-content');
+    const alphaDash = document.getElementById('alpha-dashboard');
+    if (alphaDash) alphaDash.classList.remove('blur-content');
     
     // Hide Main Content & Nav
     mainContent.style.display = 'none';
@@ -5486,16 +6085,133 @@ confirmLogout.addEventListener('click', () => {
 // Removed window.addEventListener('storage') as Firebase handles real-time updates
 
 // Handle Browser Back/Forward Buttons
-window.addEventListener('popstate', () => {
-    if (currentUser) {
-        // Re-push state to keep user on the page
-        history.pushState({ loggedIn: true }, "", window.location.href);
-        
-        // Show logout confirmation
+window.addEventListener('popstate', (e) => {
+    // Wrap in setTimeout to ensure mobile WebViews reliably register the new state push
+    setTimeout(() => {
+        history.pushState({ trap: Date.now() }, "", window.location.href);
+    }, 0);
+
+    const isVisible = (el) => el && (el.style.display === 'block' || el.style.display === 'flex');
+
+    // --- Pre-Login Navigation Handling ---
+    if (!currentUser) {
+        const preLoginModals = [
+            { el: document.getElementById('create-user-modal'), closeBtn: 'cancelCreateBtn' },
+            { el: document.getElementById('forgot-pass-modal'), closeBtn: 'cancelResetBtn' },
+            { el: document.getElementById('numcode-modal'), closeBtn: 'cancelNumCodeBtn' },
+            { el: document.getElementById('numcode-register-modal'), closeBtn: 'cancelNumRegisterBtn' }
+        ];
+        for (let m of preLoginModals) {
+            if (isVisible(m.el)) {
+                const btn = document.getElementById(m.closeBtn);
+                if (btn) btn.click();
+                return;
+            }
+        }
+        return;
+    }
+
+    // --- Post-Login Navigation Handling ---
+    
+    // 1. Close Menu if open
+    if (isVisible(menuOptions)) {
         menuOptions.style.display = 'none';
-        menuIconBtn.classList.remove('rotate');
-        logoutModal.style.display = 'flex';
-        mainContent.classList.add('blur-content');
+        if (menuIconBtn) menuIconBtn.classList.remove('rotate');
+        return;
+    }
+
+    // 2. Handle Overlays & Modals (Closes top-most layer first)
+    const overlayHandlers = [
+        { el: forwardMsgModal, closeBtn: 'cancelForwardBtn' },
+        { el: imageViewerModal, closeBtn: 'viewerBackBtn' },
+        { el: cameraLiveOverlay, closeBtn: 'closeCameraBtn' },
+        { el: document.getElementById('image-preview-overlay'), closeBtn: 'closePreviewBtn', fallback: 'retakeBtn' },
+        { el: audioRecordingOverlay, closeBtn: 'cancelAudioBtn' },
+        { el: incomingCallModal, closeBtn: 'rejectCallBtn' },
+        { el: profileModal, closeBtn: 'closeProfileBtn' },
+        { el: changePassModal, closeBtn: 'cancelChangePass' },
+        { el: deleteMsgModal, closeBtn: 'cancelDeleteMsg' },
+        { el: clearChatModal, closeBtn: 'cancelClearChat' },
+        { el: messageOptionsModal, closeBtn: 'cancelMsgOptions' },
+        { el: document.getElementById('font-modal'), closeBtn: 'font-modal-close' },
+        { el: document.getElementById('add-friend-modal'), closeClass: '.close-modal-btn' },
+        { el: document.getElementById('friends-list-modal'), closeClass: '.close-modal-btn' },
+        { el: document.getElementById('pending-req-modal'), closeClass: '.close-modal-btn' },
+        { el: document.getElementById('beta-status-modal'), closeSelector: 'button' },
+        { el: document.getElementById('status-confirm-modal'), closeBtn: 'cancelStatusConfirm' },
+        { el: document.getElementById('profile-pic-confirm-modal'), closeBtn: 'cancelProfilePicChange' },
+        { el: document.getElementById('delete-status-modal'), closeBtn: 'cancel-del-status' },
+        { el: document.getElementById('edit-msg-modal'), closeBtn: 'cancelEditMsg' },
+        { el: document.getElementById('clear-specific-call-modal'), closeBtn: 'closeSpecificCallModal' },
+        { el: document.getElementById('confirm-specific-call-modal'), closeBtn: 'cancelSpecificCallClear' }
+    ];
+
+    for (let m of overlayHandlers) {
+        if (isVisible(m.el)) {
+            if (m.closeBtn) {
+                const btn = document.getElementById(m.closeBtn) || document.getElementById(m.fallback);
+                if (btn) btn.click();
+            } else if (m.closeClass) {
+                const btn = m.el.querySelector(m.closeClass);
+                if (btn) btn.click();
+            } else if (m.closeSelector) {
+                const btn = m.el.querySelector(m.closeSelector);
+                if (btn) btn.click();
+            }
+            return;
+        }
+    }
+
+    // Handle Call Overlay (Minimize to PiP instead of closing completely)
+    if (isVisible(callOverlay)) {
+        if (!callOverlay.classList.contains('pip-mode') && typeof callPipBtn !== 'undefined') {
+            callPipBtn.click();
+            return;
+        }
+    }
+
+    // 3. Exit Message Selection Mode
+    if (isSelectionMode) {
+        exitSelectionMode();
+        return;
+    }
+
+    // 4. If Logout Modal is already open, close it to allow backing out
+    if (isVisible(logoutModal)) {
+        const cBtn = document.getElementById('cancelLogout');
+        if (cBtn) cBtn.click();
+        return;
+    }
+
+    // 5. Navigation Handling
+    if (currentUser === ALPHA_ADMIN) {
+        // Case 5a: If in a Chat Page, go back to Main Home Dashboard
+        if (currentChatPartner) {
+            if (typeof showAlphaHomeScreen === 'function') {
+                showAlphaHomeScreen();
+                return;
+            }
+        } 
+        // Case 5b: If on Dashboard
+        else {
+            const alphaMsgView = document.getElementById('alpha-view-message');
+            if (alphaMsgView && alphaMsgView.style.display === 'none') {
+                // Navigate back to 'Message' tab
+                const msgTabBtn = document.querySelector('#alpha-footer-nav > div:nth-child(1)');
+                if (msgTabBtn) {
+                    msgTabBtn.click();
+                    return; // Stop here, do not show logout prompt
+                }
+            } else {
+                // We are on the Message tab. Explicitly show the logout modal.
+                showLogoutModal();
+                return;
+            }
+        }
+    } else {
+        // Default: Beta/Other users are always on the chat screen at root level
+        showLogoutModal();
+        return;
     }
 });
 
@@ -5524,14 +6240,14 @@ window.addEventListener('popstate', () => {
     createLink.innerText = 'Create New User?';
     createLink.style.cssText = 'color: #00d2ff; cursor: pointer; font-size: 0.85rem; text-decoration: underline;';
 
-    // Face Login Link Container (Centered below)
+    // Num Code Login Link Container (Centered below)
     const faceLinkContainer = document.createElement('div');
     faceLinkContainer.style.cssText = 'display: flex; justify-content: center; margin-bottom: 15px; width: 100%;';
-    const faceLoginLink = document.createElement('span');
-    faceLoginLink.id = 'faceLoginLink';
-    faceLoginLink.innerText = 'Face login';
-    faceLoginLink.style.cssText = 'color: #00d2ff; cursor: pointer; font-size: 0.9rem; text-decoration: underline; font-weight: bold;';
-    faceLinkContainer.appendChild(faceLoginLink);
+    const numCodeLoginLink = document.createElement('span');
+    numCodeLoginLink.id = 'numCodeLoginLink';
+    numCodeLoginLink.innerText = 'Num Code Login';
+    numCodeLoginLink.style.cssText = 'color: #00d2ff; cursor: pointer; font-size: 0.9rem; text-decoration: underline; font-weight: bold;';
+    faceLinkContainer.appendChild(numCodeLoginLink);
 
     linksContainer.appendChild(forgotLink);
     linksContainer.appendChild(createLink);
@@ -6168,6 +6884,176 @@ function openBetaStatusModal() {
     }
 })();
 
+// --- Specific Call History Clear Logic ---
+window.openClearSpecificCallModal = function() {
+    let modal = document.getElementById('clear-specific-call-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'clear-specific-call-modal';
+        modal.className = 'modal-overlay';
+        modal.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10005; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
+        modal.innerHTML = `
+            <div class="modal-box" style="background: var(--alpha-card-bg, #1E293B); padding: 20px; border-radius: 15px; width: 90%; max-width: 400px; color: var(--alpha-text, white); display: flex; flex-direction: column; gap: 15px; border: 1px solid var(--alpha-border, rgba(255,255,255,0.1)); max-height: 80vh;">
+                <h3 style="margin:0; text-align: center;">Clear Call History</h3>
+                <p style="text-align: center; opacity: 0.7; font-size: 0.9rem; margin: 0;">Select a user to clear their call history</p>
+                <div id="specific-call-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px;"></div>
+                <button id="closeSpecificCallModal" class="modal-btn cancel-btn" style="padding: 10px; border-radius: 8px; cursor: pointer; border: none; background: rgba(128,128,128,0.2); color: var(--alpha-text, white); font-weight: bold;">Cancel</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        document.getElementById('closeSpecificCallModal').onclick = () => {
+            modal.style.display = 'none';
+            const dash = document.getElementById('alpha-dashboard');
+            if (dash) dash.classList.remove('blur-content');
+        };
+    }
+
+    const listContainer = document.getElementById('specific-call-list');
+    listContainer.innerHTML = '';
+
+    const uniquePartners = [...new Set(alphaCallHistoryData.map(r => r.partner))];
+    
+    if (uniquePartners.length === 0) {
+        listContainer.innerHTML = '<div style="text-align:center; padding: 20px; color: gray;">No call history available.</div>';
+    } else {
+        // Add "All Users" option at the top
+        const allItem = document.createElement('div');
+        allItem.style.cssText = 'padding: 12px 15px; background: rgba(255,71,87,0.1); border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; border: 1px solid rgba(255,71,87,0.2); transition: background 0.2s; margin-bottom: 15px;';
+        allItem.onmouseover = () => allItem.style.background = 'rgba(255,71,87,0.2)';
+        allItem.onmouseout = () => allItem.style.background = 'rgba(255,71,87,0.1)';
+        allItem.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 40px; height: 40px; border-radius: 50%; background: #ff4757; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: white;">🗑️</div>
+                <span style="font-weight: bold; font-size: 1.1rem; color: #ff4757;">Clear All Call History</span>
+            </div>
+        `;
+        allItem.onclick = () => {
+            openConfirmSpecificCallModal('ALL', 'All Users');
+        };
+        listContainer.appendChild(allItem);
+
+        uniquePartners.forEach(partner => {
+            let displayName = partner;
+            if (partner === BETA_ADMIN) displayName = "Beta";
+            else if (partner === ALPHA_ADMIN) displayName = "Alpha";
+            
+            const item = document.createElement('div');
+            item.style.cssText = 'padding: 12px 15px; background: rgba(255,255,255,0.05); border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; border: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;';
+            item.onmouseover = () => item.style.background = 'rgba(255,255,255,0.1)';
+            item.onmouseout = () => item.style.background = 'rgba(255,255,255,0.05)';
+            item.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <img id="specific-clear-pic-${partner}" src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                    <span class="partner-name-display" style="font-weight: bold; font-size: 1.05rem;">${displayName}</span>
+                </div>
+                <span style="color: #ff4757; font-size: 1.2rem;">🗑️</span>
+            `;
+            
+            if (partner !== BETA_ADMIN && partner !== ALPHA_ADMIN) {
+                db.ref(`Other User Table/${partner}`).once('value').then(s => {
+                    if (s.exists() && s.val().name) {
+                        displayName = s.val().name;
+                        const nameSpan = item.querySelector('.partner-name-display');
+                        if (nameSpan) nameSpan.innerText = displayName;
+                    }
+                });
+            }
+            
+            // Load profile picture
+            const picEl = item.querySelector(`#specific-clear-pic-${partner}`);
+            const role = getUserRole(partner);
+            db.ref(`Profile Pic/${role}_Profile_Pic`).once('value').then(s => { 
+                if(s.exists() && picEl) picEl.src = s.val(); 
+            });
+            
+            item.onclick = () => {
+                openConfirmSpecificCallModal(partner, displayName);
+            };
+            listContainer.appendChild(item);
+        });
+    }
+
+    modal.style.display = 'flex';
+    const dash = document.getElementById('alpha-dashboard');
+    if (dash) dash.classList.add('blur-content');
+};
+
+window.openConfirmSpecificCallModal = function(partnerId, partnerName) {
+    let confirmModal = document.getElementById('confirm-specific-call-modal');
+    if (!confirmModal) {
+        confirmModal = document.createElement('div');
+        confirmModal.id = 'confirm-specific-call-modal';
+        confirmModal.className = 'modal-overlay';
+        confirmModal.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10006; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
+        confirmModal.innerHTML = `
+            <div class="modal-box" style="background: var(--alpha-card-bg, #1E293B); padding: 25px; border-radius: 15px; width: 85%; max-width: 350px; color: var(--alpha-text, white); display: flex; flex-direction: column; gap: 15px; border: 1px solid var(--alpha-border, rgba(255,255,255,0.1)); text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                <h3 style="margin:0; font-size: 1.3rem;">Confirm Delete</h3>
+                <p id="confirm-specific-call-text" style="opacity: 0.8; font-size: 1rem; margin: 0; line-height: 1.4;"></p>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button id="cancelSpecificCallClear" class="modal-btn cancel-btn" style="flex: 1; padding: 10px; border-radius: 8px; cursor: pointer; border: none; background: rgba(128,128,128,0.2); color: var(--alpha-text, white); font-weight: bold;">Cancel</button>
+                    <button id="confirmSpecificCallClear" class="modal-btn confirm-btn" style="flex: 1; padding: 10px; border-radius: 8px; cursor: pointer; border: none; background: #ff4757; color: white; font-weight: bold;">Delete</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(confirmModal);
+        
+        document.getElementById('cancelSpecificCallClear').onclick = () => {
+            confirmModal.style.display = 'none';
+        };
+    }
+
+    if (partnerId === 'ALL') {
+        document.getElementById('confirm-specific-call-text').innerHTML = `Are you sure you want to delete <b style="color:#ff4757; font-size: 1.1rem;">ALL</b> call history? <br>This action cannot be undone.`;
+    } else {
+        document.getElementById('confirm-specific-call-text').innerHTML = `Are you sure you want to delete all call history with <br><b style="color:#0EA5E9; font-size: 1.1rem;">${partnerName}</b>?`;
+    }
+    
+    const confirmBtn = document.getElementById('confirmSpecificCallClear');
+    confirmBtn.onclick = () => {
+        confirmBtn.innerText = 'Deleting...';
+        confirmBtn.disabled = true;
+
+        if (partnerId === 'ALL') {
+            db.ref(`call_history/${currentUser}`).remove().then(() => {
+                showToast(`All call history cleared`);
+                confirmModal.style.display = 'none';
+                document.getElementById('clear-specific-call-modal').style.display = 'none';
+                const dash = document.getElementById('alpha-dashboard');
+                if (dash) dash.classList.remove('blur-content');
+            }).catch(err => {
+                showToast("Failed to clear call history");
+                console.error(err);
+            }).finally(() => {
+                confirmBtn.innerText = 'Delete';
+                confirmBtn.disabled = false;
+            });
+        } else {
+            const updates = {};
+            alphaCallHistoryData.forEach(record => {
+                if (record.partner === partnerId) {
+                    updates[`call_history/${currentUser}/${record.id}`] = null;
+                }
+            });
+
+            db.ref().update(updates).then(() => {
+                showToast(`Call history with ${partnerName} deleted`);
+                confirmModal.style.display = 'none';
+                document.getElementById('clear-specific-call-modal').style.display = 'none';
+                const dash = document.getElementById('alpha-dashboard');
+                if (dash) dash.classList.remove('blur-content');
+            }).catch(err => {
+                showToast("Failed to delete call history");
+                console.error(err);
+            }).finally(() => {
+                confirmBtn.innerText = 'Delete';
+                confirmBtn.disabled = false;
+            });
+        }
+    };
+
+    confirmModal.style.display = 'flex';
+};
+
 // --- Alpha User Home Screen Logic ---
 let alphaFriendListContainer;
 let alphaBackBtn;
@@ -6208,14 +7094,39 @@ function initAlphaUI() {
     `;
     alphaHomeHeader.appendChild(titleText);
 
-    const themeToggle = document.createElement('div');
-    themeToggle.innerHTML = '◑'; 
-    themeToggle.style.cssText = 'font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center;';
-    themeToggle.onclick = () => {
+    let currentStatusCount = 0;
+    
+    const headerActionBtn = document.createElement('div');
+    headerActionBtn.id = 'alpha-header-action-btn';
+    headerActionBtn.style.cssText = 'cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative; padding: 5px;';
+    
+    const headerActionIcon = document.createElement('div');
+    headerActionIcon.style.cssText = 'font-size: 1.5rem; display: flex; align-items: center; justify-content: center;';
+    headerActionBtn.appendChild(headerActionIcon);
+
+    const headerDropdown = document.createElement('div');
+    headerDropdown.id = 'alpha-header-dropdown';
+    headerDropdown.style.cssText = `
+        display: none; position: absolute; top: 40px; right: 0;
+        background: var(--alpha-card-bg, #1E293B);
+        border: 1px solid var(--alpha-border, rgba(255,255,255,0.1));
+        border-radius: 8px; padding: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        z-index: 2000; flex-direction: column; min-width: 150px;
+    `;
+    headerActionBtn.appendChild(headerDropdown);
+    alphaHomeHeader.appendChild(headerActionBtn);
+
+    document.addEventListener('click', (e) => {
+        if (!headerActionBtn.contains(e.target)) {
+            headerDropdown.style.display = 'none';
+        }
+    });
+
+    const updateThemeToggleLogic = () => {
         themeToggleBtn.click();
         const isLight = document.body.classList.contains('light-mode');
-        themeToggle.innerHTML = isLight ? '◐' : '◑';
-        dashboard.style.setProperty('--alpha-bg', isLight ? '#ffffff' : '#0F172A');
+        headerActionIcon.innerHTML = isLight ? '◐' : '◑';
+        dashboard.style.setProperty('--alpha-bg', isLight ? '#efeae2' : '#0F172A');
         dashboard.style.setProperty('--alpha-header-bg', isLight ? '#ffffff' : '#0F172A');
         dashboard.style.setProperty('--alpha-text', isLight ? '#080707' : '#e6e9ee');
         dashboard.style.setProperty('--alpha-card-bg', isLight ? '#ffffff' : '#1E293B');
@@ -6224,7 +7135,14 @@ function initAlphaUI() {
         const footerNav = document.getElementById('alpha-footer-nav');
         if (footerNav) footerNav.style.background = isLight ? '#ffffff' : '#0F172A';
     };
-    alphaHomeHeader.appendChild(themeToggle);
+
+    // Ensure dark/light toggle is visible and active immediately on login
+    const isLightInitial = document.body.classList.contains('light-mode');
+    headerActionIcon.innerHTML = isLightInitial ? '◐' : '◑';
+    headerActionBtn.onclick = (e) => {
+        e.stopPropagation();
+        updateThemeToggleLogic();
+    };
 
     dashboard.appendChild(alphaHomeHeader);
 
@@ -6335,26 +7253,15 @@ function initAlphaUI() {
     db.ref('beta_status_feed').on('value', snap => {
         const activeStatusData = snap.val();
         const imageUrls = (activeStatusData && activeStatusData.images) ? activeStatusData.images : [];
+        currentStatusCount = imageUrls.length;
         if (imageUrls.length > 0) {
             createStatusSlider(statusDisplayContainer, imageUrls, true);
             statusDisplayContainer.style.display = 'flex';
             statusEmptyText.style.display = 'none';
-            statusFab.style.display = 'none';
-            statusSendBtn.style.display = 'none';
-            statusRemoveBtn.style.display = 'block';
-            if (imageUrls.length < 5) {
-                statusAddMoreBtn.style.display = 'block';
-            } else {
-                statusAddMoreBtn.style.display = 'none';
-            }
         } else {
             statusDisplayContainer.innerHTML = '';
             statusDisplayContainer.style.display = 'none';
             statusEmptyText.style.display = 'flex';
-            statusFab.style.display = 'flex';
-            statusSendBtn.style.display = 'none';
-            statusRemoveBtn.style.display = 'none';
-            statusAddMoreBtn.style.display = 'none';
         }
     });
     
@@ -6555,29 +7462,25 @@ function initAlphaUI() {
 
                         if (isAddingMore) {
                             const combinedImages = existingImages.concat(finalImages);
-                            statusAddMoreBtn.innerText = "Adding...";
                             db.ref('beta_status_feed').update({
                                 images: combinedImages,
                                 timestamp: firebase.database.ServerValue.TIMESTAMP
                             }).then(() => {
                                 showToast("Status added");
                                 statusFileInput.value = '';
-                                statusAddMoreBtn.innerText = "+ Add More";
                             }).catch(err => {
                                 alert("Upload failed: " + err.message);
-                                statusAddMoreBtn.innerText = "+ Add More";
                             });
                         } else {
-                            createStatusSlider(statusDisplayContainer, finalImages, true);
-                            
-                            statusDisplayContainer.style.display = 'flex';
-                            statusEmptyText.style.display = 'none';
-                            statusSendBtn.style.display = 'block';
-                            statusRemoveBtn.style.display = 'none';
-                            statusFab.style.display = 'none';
-                            statusAddMoreBtn.style.display = 'none';
-
-                            pendingStatusImages = finalImages;
+                            db.ref('beta_status_feed').set({
+                                images: finalImages,
+                                timestamp: firebase.database.ServerValue.TIMESTAMP
+                            }).then(() => {
+                                showToast("Status set successfully");
+                                statusFileInput.value = '';
+                            }).catch(err => {
+                                alert("Upload failed: " + err.message);
+                            });
                         }
                     };
                 }).catch(err => {
@@ -6587,31 +7490,8 @@ function initAlphaUI() {
         });
     };
 
-    statusSendBtn.onclick = () => {
-        if (pendingStatusImages && pendingStatusImages.length > 0) {
-            statusSendBtn.innerText = "Setting...";
-            db.ref('beta_status_feed').set({
-                images: pendingStatusImages,
-                timestamp: firebase.database.ServerValue.TIMESTAMP
-            }).then(() => {
-                showToast("Status updated for Beta user");
-                statusFileInput.value = '';
-                statusSendBtn.innerText = "Set Status";
-                statusSendBtn.style.display = 'none';
-                pendingStatusImages = [];
-            }).catch(err => {
-                alert("Failed to set status: " + err.message);
-                statusSendBtn.innerText = "Set Status";
-            });
-        }
-    };
-
     statusView.appendChild(statusEmptyText);
     statusView.appendChild(statusDisplayContainer);
-    statusView.appendChild(statusAddMoreBtn);
-    statusView.appendChild(statusSendBtn);
-    statusView.appendChild(statusRemoveBtn);
-    statusView.appendChild(statusFab);
     statusView.appendChild(statusFileInput);
     contentArea.appendChild(statusView);
 
@@ -6781,6 +7661,69 @@ function initAlphaUI() {
             item.view.style.display = item.id === 'message' || item.id === 'menu' || item.id === 'status' || item.id === 'home' ? 'flex' : 'block';
             btn.style.color = '#0EA5E9';
             
+            // Dynamic Header Action Icon logic
+            headerDropdown.style.display = 'none';
+            headerActionBtn.onclick = null;
+            const threeDotsSvg = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px;"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>';
+            
+            if (item.id === 'message' || item.id === 'menu') {
+                const isLight = document.body.classList.contains('light-mode');
+                headerActionIcon.innerHTML = isLight ? '◐' : '◑';
+                headerActionIcon.style.fontSize = '1.5rem';
+                headerActionIcon.style.display = 'flex';
+                headerActionBtn.style.display = 'flex';
+                headerActionBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    updateThemeToggleLogic();
+                };
+            } else if (item.id === 'status') {
+                headerActionIcon.innerHTML = threeDotsSvg;
+                headerActionIcon.style.fontSize = '1rem';
+                headerActionBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    headerDropdown.innerHTML = '';
+                    const createDropBtn = (text, onClick) => {
+                        const b = document.createElement('div');
+                        b.innerText = text;
+                        b.style.cssText = 'padding: 10px; cursor: pointer; color: var(--alpha-text, white); font-size: 0.95rem; border-radius: 5px;';
+                        b.onmouseover = () => b.style.background = 'var(--alpha-card-hover, rgba(255,255,255,0.1))';
+                        b.onmouseout = () => b.style.background = 'transparent';
+                        b.onclick = (ev) => { ev.stopPropagation(); headerDropdown.style.display = 'none'; onClick(); };
+                        return b;
+                    };
+                    if (currentStatusCount === 0) {
+                        headerDropdown.appendChild(createDropBtn('Add Status', () => { isAddingMore = false; statusFileInput.click(); }));
+                    } else {
+                        if (currentStatusCount < 5) {
+                            headerDropdown.appendChild(createDropBtn('Add More', () => { isAddingMore = true; statusFileInput.click(); }));
+                        }
+                        headerDropdown.appendChild(createDropBtn('Remove Status', () => { statusRemoveBtn.click(); }));
+                    }
+                    headerDropdown.style.display = headerDropdown.style.display === 'flex' ? 'none' : 'flex';
+                };
+            } else if (item.id === 'call') {
+                headerActionIcon.innerHTML = threeDotsSvg;
+                headerActionIcon.style.fontSize = '1rem';
+                headerActionBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    headerDropdown.innerHTML = '';
+                    const clearBtn = document.createElement('div');
+                    clearBtn.innerText = 'Clear Call History';
+                    clearBtn.style.cssText = 'padding: 10px; cursor: pointer; color: #ff4757; font-size: 0.95rem; border-radius: 5px; font-weight: bold;';
+                    clearBtn.onmouseover = () => clearBtn.style.background = 'var(--alpha-card-hover, rgba(255,255,255,0.1))';
+                    clearBtn.onmouseout = () => clearBtn.style.background = 'transparent';
+                    clearBtn.onclick = (ev) => {
+                        ev.stopPropagation();
+                        headerDropdown.style.display = 'none';
+                        if (typeof openClearSpecificCallModal === 'function') {
+                            openClearSpecificCallModal();
+                        }
+                    };
+                    headerDropdown.appendChild(clearBtn);
+                    headerDropdown.style.display = headerDropdown.style.display === 'flex' ? 'none' : 'flex';
+                };
+            }
+
             // Show/Hide Search Bar based on tab
             if (item.id === 'message' || item.id === 'call') {
                 searchContainer.style.display = 'block';
@@ -6829,17 +7772,13 @@ function initAlphaUI() {
     createAlphaFab();
     
     // Default to 'message' tab
-    navItems.forEach(n => { n.view.style.display = 'none'; n.btn.style.color = 'gray'; });
-    navItems[0].view.style.display = 'flex';
-    navItems[0].btn.style.color = '#0EA5E9';
     if (!alphaAddFriendFab) createAlphaFab();
-    alphaAddFriendFab.style.display = 'flex';
-    renderAlphaFriendList();
+    navItems[0].btn.click();
     
     // Apply initial theme settings if body is already in light mode
     if (document.body.classList.contains('light-mode')) {
-        themeToggle.innerHTML = '◐';
-            dashboard.style.setProperty('--alpha-bg', '#ffffff');
+        headerActionIcon.innerHTML = '◐';
+            dashboard.style.setProperty('--alpha-bg', '#efeae2');
         dashboard.style.setProperty('--alpha-header-bg', '#ffffff');
             dashboard.style.setProperty('--alpha-text', '#000000');
         dashboard.style.setProperty('--alpha-card-bg', '#ffffff');
@@ -7133,6 +8072,9 @@ let selectedForwardFriends = new Set();
 async function openForwardModal() {
     forwardMsgModal.style.display = 'flex';
     mainContent.classList.add('blur-content');
+    if (imageViewerModal && imageViewerModal.style.display !== 'none') {
+        imageViewerModal.classList.add('blur-content');
+    }
     forwardFriendsList.innerHTML = '<div style="text-align: center; padding: 20px;">Loading friends...</div>';
     confirmForwardBtn.disabled = true;
     confirmForwardBtn.style.opacity = '0.5';
@@ -7217,6 +8159,7 @@ if (cancelForwardBtn) {
     cancelForwardBtn.addEventListener('click', () => {
         forwardMsgModal.style.display = 'none';
         mainContent.classList.remove('blur-content');
+        if (imageViewerModal) imageViewerModal.classList.remove('blur-content');
     });
 }
 
@@ -7269,6 +8212,7 @@ if (confirmForwardBtn) {
 
         forwardMsgModal.style.display = 'none';
         mainContent.classList.remove('blur-content');
+        if (imageViewerModal) imageViewerModal.classList.remove('blur-content');
         exitSelectionMode();
         showToast(`Forwarded to ${selectedForwardFriends.size} chat(s)`);
     });
