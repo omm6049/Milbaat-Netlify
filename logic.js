@@ -2144,8 +2144,41 @@ function updateBlockOverlay() {
     }
 }
 
+function updateAlphaUnreadBadges() {
+    if (currentUser !== ALPHA_ADMIN || !allMessagesRaw) return;
+    
+    const unreadCounts = {};
+    allMessagesRaw.forEach(msg => {
+        if (msg && msg.recipient === currentUser && msg.status !== 'seen') {
+            if (msg[`deletedBy_${currentUser}`]) return; // Respect local deletion
+            unreadCounts[msg.sender] = (unreadCounts[msg.sender] || 0) + 1;
+        }
+    });
+    
+    // Synchronously update the DOM badges in < 1ms
+    document.querySelectorAll('[id^="badge-container-"]').forEach(container => {
+        const fid = container.id.replace('badge-container-', '');
+        const badge = document.getElementById(`unread-badge-${fid}`);
+        const count = unreadCounts[fid] || 0;
+        
+        if (badge) {
+            if (count > 0) {
+                badge.innerText = count;
+                container.style.display = 'block';
+            } else {
+                container.style.display = 'none';
+            }
+        }
+    });
+}
+
 function filterAndRenderChat() {
     if (!allMessagesRaw) return;
+
+    // Instantly update unread badges on the Alpha dashboard whenever messages change
+    if (currentUser === ALPHA_ADMIN) {
+        updateAlphaUnreadBadges();
+    }
 
     // If Alpha is on home screen, don't render a chat, just update friend list counts.
     if (currentUser === ALPHA_ADMIN && !currentChatPartner) {
@@ -2290,13 +2323,15 @@ function setupFirebaseListeners() {
             const partnerData = snapshot.val() || {};
             otherUserLastSeen = partnerData.lastSeen;
             otherUserOnlineStatus = partnerData.online;
+            // Instantly update UI for status < 1ms
+            updateStatusUI(otherUserOnlineStatus, otherUserLastSeen, isOtherUserTyping);
         });
     }
 
     if (statusCheckInterval) clearInterval(statusCheckInterval);
     statusCheckInterval = setInterval(() => {
         updateStatusUI(otherUserOnlineStatus, otherUserLastSeen, isOtherUserTyping);
-    }, 1000);
+    }, 100);
 
     // 5. Typing Listener
     db.ref('typing').on('value', snapshot => {
@@ -2306,6 +2341,8 @@ function setupFirebaseListeners() {
         } else {
             isOtherUserTyping = false;
         }
+        // Instantly update UI for typing < 1ms
+        updateStatusUI(otherUserOnlineStatus, otherUserLastSeen, isOtherUserTyping);
     });
 
     // 6. Profile Picture Listener (Load saved photo)
@@ -2931,6 +2968,32 @@ function startHeartbeat(customUser = null) {
         }, 5000);
     }
 }
+
+// Handle Tab visibility changes to immediately update online/offline status
+document.addEventListener("visibilitychange", () => {
+    if (!currentUser || !db) return;
+    
+    const statusRef = db.ref(`status/${currentUser}`);
+    
+    if (document.visibilityState === "visible") {
+        statusRef.update({
+            online: true,
+            lastSeen: "Active"
+        });
+        if (currentUser === ALPHA_ADMIN) {
+            db.ref(`status/Raushan_Home`).update({ online: true, lastSeen: "Active" });
+        }
+    } else {
+        statusRef.update({
+            online: false,
+            lastSeen: firebase.database.ServerValue.TIMESTAMP
+        });
+        if (currentUser === ALPHA_ADMIN) {
+            db.ref(`status/Raushan_Home`).update({ online: false, lastSeen: firebase.database.ServerValue.TIMESTAMP });
+        }
+        db.ref(`typing/${currentUser}`).set(false);
+    }
+});
 
 function updateStatusUI(isOnline, lastSeen, isTyping) {
     if (!lastSeenDisplay) return;
@@ -6107,7 +6170,6 @@ confirmLogout.addEventListener('click', () => {
     // Reset Profile Image to default
     profileImageDisplay.src = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
     
-    if (statusCheckInterval) clearInterval(statusCheckInterval);
     clearInterval(heartbeatInterval);
     if (typeof alphaListInterval !== 'undefined' && alphaListInterval) clearInterval(alphaListInterval);
     userStatusIndicator.style.display = 'none';
@@ -7872,8 +7934,13 @@ function updateAlphaListStatus() {
                 typingEl.style.display = 'none';
                 statusEl.style.display = 'block';
             }
+                    }
+                });
+                
+                if (currentUser === ALPHA_ADMIN && currentChatPartner) {
+                    isOtherUserTyping = (latestTypingData[currentChatPartner] === true);
+                    updateStatusUI(otherUserOnlineStatus, otherUserLastSeen, isOtherUserTyping);
         }
-    });
 }
 
 function renderAlphaFriendList() {
@@ -7883,6 +7950,7 @@ function renderAlphaFriendList() {
     if (allMessagesRaw && currentUser === ALPHA_ADMIN) {
         allMessagesRaw.forEach(msg => {
             if (msg && msg.recipient === currentUser && msg.status !== 'seen') {
+                    if (msg[`deletedBy_${currentUser}`]) return; // Match consistency with badge updater
                 unreadCounts[msg.sender] = (unreadCounts[msg.sender] || 0) + 1;
             }
         });
@@ -8058,6 +8126,7 @@ function renderAlphaFriendList() {
                 if (currentUser === ALPHA_ADMIN && currentChatPartner && latestAlphaStatusData[currentChatPartner]) {
                     otherUserOnlineStatus = latestAlphaStatusData[currentChatPartner].online || false;
                     otherUserLastSeen = latestAlphaStatusData[currentChatPartner].lastSeen || null;
+                    updateStatusUI(otherUserOnlineStatus, otherUserLastSeen, isOtherUserTyping);
                 }
             });
         }
