@@ -957,40 +957,71 @@ headerLogoutBtn.addEventListener('click', () => {
         }
     }
 
-    // Handle Numpad Clicks
-    document.querySelectorAll('.numpad-btn').forEach(btn => {
-        btn.onclick = async () => {
-            const val = btn.innerText;
-            
-            if (val === '*' || val === '#') {
-                currentPin = "";
-                if(display) display.innerText = "";
-                if(regBtn) {
-                    regBtn.innerText = "Register";
-                    regBtn.style.background = "#00d2ff";
-                }
-                return;
-            }
-
-            currentPin += val;
-            if(display) display.innerText = '*'.repeat(currentPin.length);
-
-            // Transform button automatically to Login Mode
+    function processNumpadInput(val) {
+        if (val === '*' || val === '#') {
+            currentPin = "";
+            if(display) display.innerText = "";
             if(regBtn) {
-                regBtn.innerText = "Login";
-                regBtn.style.background = "#2ecc71";
+                regBtn.innerText = "Register";
+                regBtn.style.background = "#00d2ff";
             }
+            return;
+        }
+        
+        if (val === 'Backspace') {
+            currentPin = currentPin.slice(0, -1);
+            if(display) display.innerText = '*'.repeat(currentPin.length);
+            if (currentPin.length === 0 && regBtn) {
+                regBtn.innerText = "Register";
+                regBtn.style.background = "#00d2ff";
+            }
+            return;
+        }
 
-            if (currentPin.length > 8) {
-                if (display && display.parentElement) triggerShake(display.parentElement); 
-                currentPin = "";
-                if (display) display.innerText = "";
-                if (regBtn) {
-                    regBtn.innerText = "Register";
-                    regBtn.style.background = "#00d2ff";
-                }
+        currentPin += val;
+        if(display) display.innerText = '*'.repeat(currentPin.length);
+
+        // Transform button automatically to Login Mode
+        if(regBtn) {
+            regBtn.innerText = "Login";
+            regBtn.style.background = "#2ecc71";
+        }
+
+        if (currentPin.length > 8) {
+            if (display && display.parentElement) triggerShake(display.parentElement); 
+            currentPin = "";
+            if (display) display.innerText = "";
+            if (regBtn) {
+                regBtn.innerText = "Register";
+                regBtn.style.background = "#00d2ff";
             }
         };
+    }
+
+    // Handle Numpad Clicks
+    document.querySelectorAll('.numpad-btn').forEach(btn => {
+        btn.onclick = () => {
+            processNumpadInput(btn.innerText);
+        };
+    });
+
+    // Handle Keyboard Input
+    document.addEventListener('keydown', (e) => {
+        if (numModal && numModal.style.display === 'flex') {
+            const key = e.key;
+            if (/^[0-9]$/.test(key) || key === '*' || key === '#') {
+                e.preventDefault();
+                processNumpadInput(key);
+            } else if (key === 'Backspace') {
+                e.preventDefault();
+                processNumpadInput('Backspace');
+            } else if (key === 'Enter') {
+                e.preventDefault();
+                if (regBtn) regBtn.click();
+            } else if (key === 'Escape') {
+                if (cancelBtn) cancelBtn.click();
+            }
+        }
     });
 
     if(regBtn) {
@@ -1145,6 +1176,7 @@ let replyToMsg = null;
 let heartbeatInterval = null;
 let statusCheckInterval = null;
 let typingCheckInterval = null;
+let inputTypingTimeout = null;
 let mediaRecorder = null;
 let audioChunks = [];
 let recordingInterval = null;
@@ -2803,7 +2835,7 @@ acceptBtn.addEventListener('click', async (e) => {
             currentChatPartner = ALPHA_ADMIN;
             chatInputBar.style.display = 'flex';
             
-            if (typeof headerLogoutBtn !== 'undefined' && headerLogoutBtn) headerLogoutBtn.style.display = 'flex';
+            if (typeof headerLogoutBtn !== 'undefined' && headerLogoutBtn) headerLogoutBtn.style.display = 'none';
         }
         
         updatePinnedMessageListener();
@@ -2889,6 +2921,8 @@ function startHeartbeat(customUser = null) {
         online: false,
         lastSeen: firebase.database.ServerValue.TIMESTAMP
     });
+    
+    db.ref(`typing/${targetUser}`).onDisconnect().set(false);
 
     if (targetUser === BETA_ADMIN) {
         db.ref(`Notification Alert/${ALPHA_ADMIN}`).set(true).catch(e => console.error(e));
@@ -2909,7 +2943,7 @@ function updateStatusUI(isOnline, lastSeen, isTyping) {
     lastSeenDisplay.style.display = 'block';
     lastSeenDisplay.style.marginTop = '2px';
 
-    if (isTyping) {
+    if (isOnline && isTyping) {
         lastSeenDisplay.innerText = "Typing...";
         lastSeenDisplay.style.color = '#2ecc71';
         return;
@@ -3976,8 +4010,9 @@ msgInput.addEventListener('input', () => {
     if (currentUser && db) {
         const typingRef = db.ref(`typing/${currentUser}`);
         typingRef.set(true);
+        if (inputTypingTimeout) clearTimeout(inputTypingTimeout);
         // Clear typing status after 2 seconds of inactivity
-        setTimeout(() => typingRef.set(false), 2000);
+        inputTypingTimeout = setTimeout(() => typingRef.set(false), 2000);
     }
 });
 
@@ -4314,7 +4349,7 @@ async function startCall(video, isIncoming = false) {
         });
     }
 
-    callStatusText.innerText = isIncoming ? "Connecting..." : "Ringing";
+    callStatusText.innerText = "Ringing";
     callStatusText.style.display = 'block';
     callStatusText.classList.add('blink-anim');
     
@@ -4353,13 +4388,12 @@ async function startCall(video, isIncoming = false) {
         if (!isIncoming) {
             createPeerConnection(true);
             
-            // Initial timeout for connecting (10s).
             if (ringingTimeout) clearTimeout(ringingTimeout);
             ringingTimeout = setTimeout(() => {
-            if (!isCallConnected) {
-                showToast("No answer");
-                endCall(false); 
-            }
+                if (!isCallConnected) {
+                    showToast("No answer");
+                    endCall(false); 
+                }
             }, 15000);
         }
         
@@ -6045,6 +6079,7 @@ confirmLogout.addEventListener('click', () => {
         }
 
         db.ref(`status/${currentUser}`).onDisconnect().cancel();
+        db.ref(`typing/${currentUser}`).onDisconnect().cancel();
 
         db.ref('messages').off();
         if (currentPinnedRef) currentPinnedRef.off();
@@ -7816,6 +7851,7 @@ function showAlphaHomeScreen() {
 
 let alphaRenderGeneration = 0;
 let latestAlphaStatusData = {};
+let latestTypingData = {};
 
 function updateAlphaListStatus() {
     const dots = document.querySelectorAll('[id^="status-dot-"]');
@@ -7825,6 +7861,18 @@ function updateAlphaListStatus() {
         const isOnline = friendStatus.online === true;
         dot.style.background = isOnline ? '#00e676' : '#ff1744';
         dot.style.boxShadow = isOnline ? '0 0 8px rgba(0, 230, 118, 0.6)' : 'none';
+        
+        const typingEl = document.getElementById(`typing-${fid}`);
+        const statusEl = document.querySelector(`.status-text-${fid}`);
+        if (typingEl && statusEl) {
+            if (isOnline && latestTypingData[fid] === true) {
+                typingEl.style.display = 'block';
+                statusEl.style.display = 'none';
+            } else {
+                typingEl.style.display = 'none';
+                statusEl.style.display = 'block';
+            }
+        }
     });
 }
 
@@ -7907,6 +7955,7 @@ function renderAlphaFriendList() {
         // 1. Update or Create
         friendsData.forEach(f => {
             const isOnline = latestAlphaStatusData[f.id]?.online === true;
+            const isTyping = isOnline && latestTypingData[f.id] === true;
             
             const statusColor = isOnline ? '#00e676' : '#ff1744';
             const boxShadow = isOnline ? '0 0 8px rgba(0, 230, 118, 0.6)' : 'none';
@@ -7970,8 +8019,8 @@ function renderAlphaFriendList() {
                             </span>
                         </div>
                         <div style="display: flex; align-items: center;">
-                            <span id="typing-${f.id}" style="display: none; color: #00d2ff; font-size: 0.85rem; font-style: italic; animation: blinkText 1s infinite;">Typing...</span>
-                            <span class="status-text-${f.id}" style="font-size: 0.85rem; color: var(--alpha-text, white); opacity: 0.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${f.statusMsg}</span>
+                            <span id="typing-${f.id}" style="display: ${isTyping ? 'block' : 'none'}; color: #00d2ff; font-size: 0.85rem; font-style: italic; animation: blinkText 1s infinite;">Typing...</span>
+                            <span class="status-text-${f.id}" style="font-size: 0.85rem; color: var(--alpha-text, white); opacity: 0.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: ${isTyping ? 'none' : 'block'};">${f.statusMsg}</span>
                         </div>
                     </div>
                 </div>
@@ -8016,12 +8065,15 @@ function renderAlphaFriendList() {
         // Ensure typing listener is active for the list
         if (!alphaTypingListener) {
             alphaTypingListener = db.ref('typing').on('value', snapshot => {
-                const typingData = snapshot.val() || {};
-                Object.keys(typingData).forEach(uid => {
+                latestTypingData = snapshot.val() || {};
+                const friendCards = document.querySelectorAll('.friend-card');
+                friendCards.forEach(card => {
+                    const uid = card.id.replace('friend-card-', '');
                     const typingEl = document.getElementById(`typing-${uid}`);
                     const statusEl = document.querySelector(`.status-text-${uid}`);
                     if (typingEl && statusEl) {
-                        if (typingData[uid]) {
+                        const isOnline = latestAlphaStatusData[uid]?.online === true;
+                        if (isOnline && latestTypingData[uid] === true) {
                             typingEl.style.display = 'block';
                             statusEl.style.display = 'none';
                         } else {
