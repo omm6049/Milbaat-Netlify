@@ -1285,13 +1285,13 @@ if (!bgImage && bgOverlay) {
 
     const copyBtn = document.createElement('div');
     copyBtn.id = 'selCopyBtn';
-    copyBtn.innerHTML = '<img src="Copy Icon.png" style="height: 24px; width: 24px; object-fit: contain; filter: brightness(0) invert(1); pointer-events: none;">';
+    copyBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px; pointer-events: none; color: white;"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
     copyBtn.style.cssText = iconStyle;
     header.appendChild(copyBtn);
 
     const forwardBtn = document.createElement('div');
     forwardBtn.id = 'selForwardBtn';
-    forwardBtn.innerHTML = '<img src="Forward Icon.png" style="height: 24px; width: 24px; object-fit: contain; filter: brightness(0) invert(1); pointer-events: none;">';
+    forwardBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px; pointer-events: none; color: white;"><path d="M14 5l7 7-7 7v-4.1c-5 0-8.5 1.6-11 5.1 1-5 4-10 11-11v-4z"/></svg>';
     forwardBtn.style.cssText = iconStyle;
     header.appendChild(forwardBtn);
 
@@ -1442,6 +1442,11 @@ let viewerTranslateX = 0;
 let viewerTranslateY = 0;
 let initialPinchDistance = 0;
 let initialScale = 1;
+// Swipe detection variables
+let swipeStartX = 0;
+let swipeStartY = 0;
+let swipeEndX = 0;
+let swipeEndY = 0;
 
 // --- Dynamic Edit Modal Creation ---
 (function createEditModal() {
@@ -4440,11 +4445,9 @@ async function startCall(video, isIncoming = false) {
                 t.applyConstraints({ width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30 } });
             });
             callLocalVideo.srcObject = callStream;
-            // Mirror videos for user-facing camera to feel like a mirror
-            if (callFacingMode === 'user') {
-                callLocalVideo.style.transform = 'scaleX(-1)';
-                callRemoteVideo.style.transform = 'scaleX(-1)';
-            }
+            // Mirror only the local video for user-facing camera to feel like a mirror
+            callLocalVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+            callRemoteVideo.style.transform = 'none';
         }
 
         // 3. Initiate Connection if Caller
@@ -4918,10 +4921,14 @@ function swapVideoFeeds() {
     callLocalVideo.style.transform = 'none';
     callRemoteVideo.style.transform = 'none';
 
-    // Re-apply mirroring to both elements if using the front camera
-    if (callFacingMode === 'user') {
-        callLocalVideo.style.transform = 'scaleX(-1)';
-        callRemoteVideo.style.transform = 'scaleX(-1)';
+    // Re-apply mirroring to the element currently showing the local stream if using the front camera
+    const isLocalInSmallBox = (callLocalVideo.srcObject === callStream);
+    if (isLocalInSmallBox) {
+        callLocalVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+        callRemoteVideo.style.transform = 'none';
+    } else {
+        callRemoteVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+        callLocalVideo.style.transform = 'none';
     }
 
     // Ensure playback continues
@@ -4961,12 +4968,14 @@ callFlipBtn.addEventListener('click', async (e) => {
             callStream.removeTrack(oldVideoTrack);
             callStream.addTrack(newVideoTrack);
 
-            // Update mirroring on the correct element
-            callLocalVideo.style.transform = 'none';
-            callRemoteVideo.style.transform = 'none';
-            if (callFacingMode === 'user') {
-                callLocalVideo.style.transform = 'scaleX(-1)';
-                callRemoteVideo.style.transform = 'scaleX(-1)';
+            // Update mirroring on the element showing the local stream
+            const isLocalInSmallBox = (callLocalVideo.srcObject === callStream);
+            if (isLocalInSmallBox) {
+                callLocalVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+                callRemoteVideo.style.transform = 'none';
+            } else {
+                callRemoteVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+                callLocalVideo.style.transform = 'none';
             }
             
             // Restore Mute State
@@ -5041,8 +5050,13 @@ callPipBtn.addEventListener('click', (e) => {
         pipVideo.srcObject = callRemoteVideo.srcObject;
         if (pipHeader) pipHeader.innerText = "Video Call";
         
-        // Maintain mirror effect in PiP if using front camera
-        pipVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+        // Maintain mirror effect in PiP if it's showing the local front camera
+        const isLocalInBigBox = (callRemoteVideo.srcObject === callStream);
+        if (isLocalInBigBox && callFacingMode === 'user') {
+            pipVideo.style.transform = 'scaleX(-1)';
+        } else {
+            pipVideo.style.transform = 'none';
+        }
     } else {
         pipVideo.style.display = 'none';
         if (pipProfilePic) {
@@ -6010,15 +6024,89 @@ if (viewerNextBtn) {
 
 // Update Transform
 function updateViewerTransform() {
+    // Reset if scale is at or below 1, and exit.
     if (viewerScale <= 1) {
         viewerScale = 1;
         viewerTranslateX = 0;
         viewerTranslateY = 0;
+        viewerImage.style.transform = `translate(0px, 0px) scale(1)`;
+        if (viewerImage.style.cursor !== 'zoom-in') viewerImage.style.cursor = 'zoom-in';
+        return;
     }
+
+    if (viewerImage.style.cursor !== 'grab') viewerImage.style.cursor = 'grab';
+
+    // --- Boundary calculation for panning when zoomed in ---
+    const container = viewerImage.parentElement;
+    if (!container) return;
+
+    const containerWidth = container.offsetWidth;
+    const containerHeight = container.offsetHeight;
+    
+    const imageRenderedWidth = viewerImage.offsetWidth;
+    const imageRenderedHeight = viewerImage.offsetHeight;
+
+    const scaledWidth = imageRenderedWidth * viewerScale;
+    const scaledHeight = imageRenderedHeight * viewerScale;
+
+    const maxX = Math.max(0, (scaledWidth - containerWidth) / 2);
+    const maxY = Math.max(0, (scaledHeight - containerHeight) / 2);
+
+    // Clamp the translation values
+    viewerTranslateX = Math.max(-maxX, Math.min(maxX, viewerTranslateX));
+    viewerTranslateY = Math.max(-maxY, Math.min(maxY, viewerTranslateY));
+
     viewerImage.style.transform = `translate(${viewerTranslateX}px, ${viewerTranslateY}px) scale(${viewerScale})`;
 }
 
 // Touch Gestures (Pinch to Zoom & Pan)
+
+// --- Add mouse events for desktop panning and zooming ---
+viewerImage.addEventListener('mousedown', (e) => {
+    if (viewerScale > 1) {
+        e.preventDefault();
+        viewerPanning = true;
+        viewerImage.style.cursor = 'grabbing';
+        viewerStartX = e.pageX - viewerTranslateX;
+        viewerStartY = e.pageY - viewerTranslateY;
+    }
+});
+
+// Listen on the modal to allow dragging outside the image bounds
+imageViewerModal.addEventListener('mousemove', (e) => {
+    if (viewerPanning) { // No need to check scale > 1, panning is only true if it is
+        e.preventDefault();
+        viewerTranslateX = e.pageX - viewerStartX;
+        viewerTranslateY = e.pageY - viewerStartY;
+        updateViewerTransform();
+    }
+});
+
+// Listen on the window for mouseup to catch it anywhere
+window.addEventListener('mouseup', () => {
+    if (viewerPanning) {
+        viewerPanning = false;
+        viewerImage.style.cursor = 'grab';
+    }
+});
+
+// Mouse wheel to zoom
+viewerImage.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.2 : 0.2; // Zoom sensitivity
+    const newScale = viewerScale + delta;
+    viewerScale = Math.min(Math.max(1, newScale), 8); // Max zoom 8x
+    updateViewerTransform();
+}, { passive: false });
+
+// Update cursor on hover
+viewerImage.addEventListener('mouseenter', () => {
+    viewerImage.style.cursor = viewerScale > 1 ? 'grab' : 'zoom-in';
+});
+viewerImage.addEventListener('mouseleave', () => {
+    viewerImage.style.cursor = 'default';
+});
+
 viewerImage.addEventListener('touchstart', (e) => {
     if (e.touches.length === 2) {
         e.preventDefault(); // Prevent browser zoom
@@ -6031,11 +6119,16 @@ viewerImage.addEventListener('touchstart', (e) => {
         viewerPanning = true;
         viewerStartX = e.touches[0].pageX - viewerTranslateX;
         viewerStartY = e.touches[0].pageY - viewerTranslateY;
+        // For swipe detection
+        swipeStartX = e.touches[0].pageX;
+        swipeStartY = e.touches[0].pageY;
+        swipeEndX = e.touches[0].pageX; // Initialize to start
+        swipeEndY = e.touches[0].pageY;
     }
 });
 
 viewerImage.addEventListener('touchmove', (e) => {
-    if (e.touches.length === 2) {
+    if (e.touches.length === 2 && initialPinchDistance > 0) {
         e.preventDefault();
         const currentDistance = Math.hypot(
             e.touches[0].pageX - e.touches[1].pageX,
@@ -6044,16 +6137,45 @@ viewerImage.addEventListener('touchmove', (e) => {
         const diff = currentDistance / initialPinchDistance;
         viewerScale = Math.min(Math.max(1, initialScale * diff), 5);
         updateViewerTransform();
-    } else if (e.touches.length === 1 && viewerPanning && viewerScale > 1) {
-        e.preventDefault(); // Prevent scroll
-        viewerTranslateX = e.touches[0].pageX - viewerStartX;
-        viewerTranslateY = e.touches[0].pageY - viewerStartY;
-        updateViewerTransform();
+    } else if (e.touches.length === 1 && viewerPanning) {
+        // For swipe detection
+        swipeEndX = e.touches[0].pageX;
+        swipeEndY = e.touches[0].pageY;
+
+        if (viewerScale > 1) {
+            e.preventDefault(); // Prevent page scroll only when panning a zoomed image
+            viewerTranslateX = e.touches[0].pageX - viewerStartX;
+            viewerTranslateY = e.touches[0].pageY - viewerStartY;
+            updateViewerTransform();
+        }
     }
 });
 
-viewerImage.addEventListener('touchend', () => {
+viewerImage.addEventListener('touchend', (e) => {
+    // If it was a multi-touch gesture, just end it.
+    if (e.touches.length > 0) {
+        viewerPanning = false;
+        return;
+    }
+
+    // Handle swipe logic for single touch end
+    if (viewerPanning && viewerScale === 1 && swipeStartX !== 0) {
+        const diffX = swipeEndX - swipeStartX;
+        const diffY = swipeEndY - swipeStartY;
+        const swipeThreshold = 50; // Minimum pixels to be considered a swipe
+
+        // Check for a clear horizontal swipe
+        if (Math.abs(diffX) > swipeThreshold && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
+            if (diffX > 0 && viewerPrevBtn && viewerPrevBtn.style.pointerEvents !== 'none') {
+                viewerPrevBtn.click();
+            } else if (diffX < 0 && viewerNextBtn && viewerNextBtn.style.pointerEvents !== 'none') {
+                viewerNextBtn.click();
+            }
+        }
+    }
+
     viewerPanning = false;
+    swipeStartX = swipeStartY = swipeEndX = swipeEndY = 0; // Reset swipe tracking
 });
 
 // Double tap to reset
@@ -7330,10 +7452,7 @@ function initAlphaUI() {
         display: flex; align-items: center; justify-content: center;
         cursor: pointer; z-index: 1000; transition: transform 0.2s;
     `;
-    const fabIcon = document.createElement('img');
-    fabIcon.src = 'Add Friend Icon.png';
-    fabIcon.style.cssText = 'width: 30px; height: 30px; object-fit: contain; pointer-events: none; filter: brightness(0) invert(1);';
-    statusFab.appendChild(fabIcon);
+    statusFab.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 30px; height: 30px; color: white; pointer-events: none;"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
 
     const statusFileInput = document.createElement('input');
     statusFileInput.type = 'file';
@@ -7971,7 +8090,7 @@ function renderAlphaFriendList() {
             if (!document.getElementById('no-friends-placeholder')) {
                 alphaFriendListContainer.innerHTML = `
                     <div id="no-friends-placeholder" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 50vh; color: var(--alpha-text, white); opacity: 0.6;">
-                        <img src="Add Friend Icon.png" style="width: 80px; opacity: 0.3; margin-bottom: 20px; filter: invert(1);">
+                        <svg viewBox="0 0 24 24" fill="currentColor" style="width: 80px; height: 80px; opacity: 0.3; margin-bottom: 20px; color: white;"><path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                         <div style="font-size: 1.2rem;">No friends yet</div>
                         <div style="font-size: 0.9rem;">Tap the + button to add someone</div>
                     </div>
