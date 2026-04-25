@@ -1221,6 +1221,7 @@ let currentCallTarget = null;
 let callStatusLogged = false;
 let callHistoryView = null;
 let alphaCallHistoryData = [];
+let remoteFacingMode = 'user';
 
 // --- Set Custom Background ---
 body.style.background = "none";
@@ -2290,7 +2291,8 @@ function setupFirebaseListeners() {
                     type: 'offer',
                     sender: data.sender,
                     data: data.sdp,
-                    isVideo: cType === 'Video'
+                    isVideo: cType === 'Video',
+                    facingMode: data.facingMode || 'user'
                 });
             }
             // Handle Answer (Call Accepted)
@@ -2300,10 +2302,21 @@ function setupFirebaseListeners() {
                     type: 'answer',
                     sender: data.sender,
                     data: data.sdp,
-                    isVideo: cType === 'Video'
+                    isVideo: cType === 'Video',
+                    facingMode: data.facingMode || 'user'
                 });
             }
         });
+    });
+
+    db.ref(`signals/${myRole}_facingMode`).on('value', snapshot => {
+        const data = snapshot.val();
+        if (data && data.sender !== currentUser) {
+            handleIncomingSignal({
+                type: 'facingMode',
+                facingMode: data.facingMode
+            });
+        }
     });
 
     // Listen for Candidates
@@ -4175,8 +4188,8 @@ async function startCameraStream() {
         cameraStream.getTracks().forEach(track => track.stop());
     }
     
-    // Mirror effect: Always mirror the view for a mirror-like experience as requested
-    cameraVideo.style.transform = 'scaleX(-1)';
+    // Mirror effect: Only mirror the view for the front (user) camera
+    cameraVideo.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'none';
 
     const label = document.getElementById('cameraFacingLabel');
     if (label) label.innerText = currentFacingMode === 'user' ? 'Front Cam' : 'Back Cam';
@@ -4294,9 +4307,11 @@ captureCameraBtn.addEventListener('click', () => {
     canvas.height = sHeight;
     const ctx = canvas.getContext('2d');
     
-    // Always mirror the capture to match the requested mirror view
-    ctx.translate(canvas.width, 0);
-    ctx.scale(-1, 1);
+    // Mirror the capture only if the front camera is used
+    if (currentFacingMode === 'user') {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+    }
     
     // Apply Filter from Live View
     const fIdx = parseInt(cameraVideo.dataset.filterIndex || '0');
@@ -4445,9 +4460,7 @@ async function startCall(video, isIncoming = false) {
                 t.applyConstraints({ width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30 } });
             });
             callLocalVideo.srcObject = callStream;
-            // Mirror only the local video for user-facing camera to feel like a mirror
-            callLocalVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1)' : 'none';
-            callRemoteVideo.style.transform = 'none';
+            updateVideoMirroring();
         }
 
         // 3. Initiate Connection if Caller
@@ -4518,6 +4531,7 @@ function createPeerConnection(isInitiator) {
             });
         }
         updateAudioOutput();
+        updateVideoMirroring();
     };
 
     // Add Local Tracks
@@ -4546,6 +4560,7 @@ function sendSignal(type, data) {
     const incomingPath = `signals/${targetRole}_incoming_${callType}`; // Where I write offers
     const myIncomingPath = `signals/${myRole}_incoming_${callType}`; // Where I write answers (if I am receiver)
     const candidatePath = `signals/${targetRole}_candidates`;
+    const facingModePath = `signals/${targetRole}_facingMode`;
 
     if (type === 'offer') {
         const ref = db.ref(incomingPath);
@@ -4554,7 +4569,8 @@ function sendSignal(type, data) {
             sender: currentUser,
             recipient: targetUser,
             sdp: JSON.parse(JSON.stringify(data)),
-            timestamp: firebase.database.ServerValue.TIMESTAMP
+            timestamp: firebase.database.ServerValue.TIMESTAMP,
+            facingMode: callFacingMode
         });
         ref.onDisconnect().remove();
 
@@ -4576,7 +4592,8 @@ function sendSignal(type, data) {
             sender: currentUser,
             recipient: targetUser,
             sdp: JSON.parse(JSON.stringify(data)),
-            timestamp: firebase.database.ServerValue.TIMESTAMP
+            timestamp: firebase.database.ServerValue.TIMESTAMP,
+            facingMode: callFacingMode
         });
 
         if (currentUser === ALPHA_ADMIN) {
@@ -4589,12 +4606,20 @@ function sendSignal(type, data) {
             sender: currentUser,
             recipient: targetUser
         });
+    } else if (type === 'facingMode') {
+        db.ref(facingModePath).set({
+            sender: currentUser,
+            facingMode: data,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+        });
     } else if (type === 'end') {
         // Remove all signal nodes for this call type
         db.ref(`signals/${myRole}_incoming_${callType}`).remove();
         db.ref(`signals/${targetRole}_incoming_${callType}`).remove();
         db.ref(`signals/${myRole}_candidates`).remove();
         db.ref(`signals/${targetRole}_candidates`).remove();
+        db.ref(`signals/${myRole}_facingMode`).remove();
+        db.ref(`signals/${targetRole}_facingMode`).remove();
 
         if (targetUser === ALPHA_ADMIN || currentUser === ALPHA_ADMIN) {
             db.ref(`Notification Alert/Incoming call`).set('deactive');
@@ -4620,6 +4645,7 @@ function handleIncomingSignal(signal) {
         incomingSignalData = signal;
         currentCallTarget = signal.sender;
         isVideoCall = signal.isVideo;
+        remoteFacingMode = signal.facingMode || 'user';
         
         let displayName = signal.sender;
         if (signal.sender === ALPHA_ADMIN) displayName = "Alpha";
@@ -4657,6 +4683,7 @@ function handleIncomingSignal(signal) {
     else if (signal.type === 'answer') {
         if (peerConnection && peerConnection.signalingState !== 'stable') {
             const desc = new RTCSessionDescription(signal.data);
+            remoteFacingMode = signal.facingMode || 'user';
             peerConnection.setRemoteDescription(desc)
                 .then(() => {
                     if (ringingTimeout) clearTimeout(ringingTimeout);
@@ -4665,6 +4692,7 @@ function handleIncomingSignal(signal) {
                     callStatusText.innerText = "Connected";
                     startCallTimer();
                     processCandidateQueue();
+                    updateVideoMirroring();
                 })
                 .catch(e => console.error("Set Remote Desc Error:", e));
         }
@@ -4677,6 +4705,9 @@ function handleIncomingSignal(signal) {
         } else {
             candidateQueue.push(candidate);
         }
+    } else if (signal.type === 'facingMode') {
+        remoteFacingMode = signal.facingMode || 'user';
+        updateVideoMirroring();
     }
 }
 
@@ -4904,6 +4935,30 @@ callVideoMuteBtn.addEventListener('click', (e) => {
     }
 });
 
+function updateVideoMirroring() {
+    if (!isVideoCall) return;
+
+    const isLocalInSmallBox = (callLocalVideo.srcObject === callStream);
+    
+    if (isLocalInSmallBox) {
+        callLocalVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+        callRemoteVideo.style.transform = (remoteFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+    } else {
+        callRemoteVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+        callLocalVideo.style.transform = (remoteFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+    }
+    
+    const pipVideo = document.getElementById('pip-remote-video');
+    if (pipVideo) {
+        const isLocalInBigBox = (callRemoteVideo.srcObject === callStream);
+        if (isLocalInBigBox) {
+            pipVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+        } else {
+            pipVideo.style.transform = (remoteFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+        }
+    }
+}
+
 // --- Swap Video Feeds on Tap ---
 function swapVideoFeeds() {
     if (!isVideoCall || !callLocalVideo.srcObject || !callRemoteVideo.srcObject) {
@@ -4917,19 +4972,7 @@ function swapVideoFeeds() {
     callLocalVideo.srcObject = remoteVideoSrc;
     callRemoteVideo.srcObject = localVideoSrc;
 
-    // Reset transforms first.
-    callLocalVideo.style.transform = 'none';
-    callRemoteVideo.style.transform = 'none';
-
-    // Re-apply mirroring to the element currently showing the local stream if using the front camera
-    const isLocalInSmallBox = (callLocalVideo.srcObject === callStream);
-    if (isLocalInSmallBox) {
-        callLocalVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1)' : 'none';
-        callRemoteVideo.style.transform = 'none';
-    } else {
-        callRemoteVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1)' : 'none';
-        callLocalVideo.style.transform = 'none';
-    }
+    updateVideoMirroring();
 
     // Ensure playback continues
     callLocalVideo.play().catch(e => console.error("Local video play failed after swap:", e));
@@ -4968,15 +5011,8 @@ callFlipBtn.addEventListener('click', async (e) => {
             callStream.removeTrack(oldVideoTrack);
             callStream.addTrack(newVideoTrack);
 
-            // Update mirroring on the element showing the local stream
-            const isLocalInSmallBox = (callLocalVideo.srcObject === callStream);
-            if (isLocalInSmallBox) {
-                callLocalVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1)' : 'none';
-                callRemoteVideo.style.transform = 'none';
-            } else {
-                callRemoteVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1)' : 'none';
-                callLocalVideo.style.transform = 'none';
-            }
+            updateVideoMirroring();
+            sendSignal('facingMode', callFacingMode);
             
             // Restore Mute State
             if (newVideoTrack) newVideoTrack.enabled = !isVideoMuted;
@@ -5050,13 +5086,7 @@ callPipBtn.addEventListener('click', (e) => {
         pipVideo.srcObject = callRemoteVideo.srcObject;
         if (pipHeader) pipHeader.innerText = "Video Call";
         
-        // Maintain mirror effect in PiP if it's showing the local front camera
-        const isLocalInBigBox = (callRemoteVideo.srcObject === callStream);
-        if (isLocalInBigBox && callFacingMode === 'user') {
-            pipVideo.style.transform = 'scaleX(-1)';
-        } else {
-            pipVideo.style.transform = 'none';
-        }
+        updateVideoMirroring();
     } else {
         pipVideo.style.display = 'none';
         if (pipProfilePic) {
