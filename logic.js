@@ -5867,6 +5867,9 @@ function openImageViewer(msgId, defaultSrc) {
     const editBtn = document.getElementById('viewerEditBtn');
     if (editBtn) editBtn.style.display = 'flex';
 
+    const forwardBtn = document.getElementById('viewerForwardBtn');
+    if (forwardBtn) forwardBtn.style.display = 'flex';
+
     const prevBtn = document.getElementById('viewerPrevBtn');
     const nextBtn = document.getElementById('viewerNextBtn');
     if (prevBtn) prevBtn.style.display = 'flex';
@@ -5945,6 +5948,9 @@ function openVideoViewer(src) {
     const editBtn = document.getElementById('viewerEditBtn');
     if (editBtn) editBtn.style.display = 'none';
     
+    const forwardBtn = document.getElementById('viewerForwardBtn');
+    if (forwardBtn) forwardBtn.style.display = 'flex';
+
     const prevBtn = document.getElementById('viewerPrevBtn');
     const nextBtn = document.getElementById('viewerNextBtn');
     if (prevBtn) prevBtn.style.display = 'none';
@@ -6386,7 +6392,6 @@ window.addEventListener('popstate', (e) => {
         { el: document.getElementById('add-friend-modal'), closeClass: '.close-modal-btn' },
         { el: document.getElementById('friends-list-modal'), closeClass: '.close-modal-btn' },
         { el: document.getElementById('pending-req-modal'), closeClass: '.close-modal-btn' },
-        { el: document.getElementById('beta-status-modal'), closeSelector: 'button' },
         { el: document.getElementById('status-confirm-modal'), closeBtn: 'cancelStatusConfirm' },
         { el: document.getElementById('profile-pic-confirm-modal'), closeBtn: 'cancelProfilePicChange' },
         { el: document.getElementById('delete-status-modal'), closeBtn: 'cancel-del-status' },
@@ -6887,53 +6892,41 @@ function createStatusSlider(container, imageUrls, isEditable) {
 }
 
 function openBetaStatusModal() {
-    let modal = document.getElementById('beta-status-modal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'beta-status-modal';
-        modal.className = 'modal-overlay';
-        modal.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10001; align-items: center; justify-content: center; backdrop-filter: blur(10px); flex-direction: column;';
-        
-        const closeBtn = document.createElement('button');
-        closeBtn.innerHTML = '✖';
-        closeBtn.style.cssText = 'position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.2); border: none; color: white; font-size: 1.5rem; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;';
-        closeBtn.onclick = () => {
-            modal.style.display = 'none';
-            if(mainContent) mainContent.classList.remove('blur-content');
-        };
-        
-        const sliderContainer = document.createElement('div');
-        sliderContainer.id = 'beta-status-slider-container';
-        sliderContainer.style.cssText = 'position: relative; width: 90%; height: 80%;';
-        
-        const noStatusTxt = document.createElement('div');
-        noStatusTxt.id = 'beta-status-no-txt';
-        noStatusTxt.innerText = 'No status uploaded yet.';
-        noStatusTxt.style.cssText = 'color: white; font-size: 1.2rem; display: none;';
-        
-        modal.appendChild(closeBtn);
-        modal.appendChild(sliderContainer);
-        modal.appendChild(noStatusTxt);
-        document.body.appendChild(modal);
-    }
-
-    modal.style.display = 'flex';
-    if(mainContent) mainContent.classList.add('blur-content');
-
-    const sliderContainer = document.getElementById('beta-status-slider-container');
-    const noTxt = document.getElementById('beta-status-no-txt');
-
     db.ref('beta_status_feed').once('value').then(snap => {
         const data = snap.val();
         const imageUrls = (data && data.images) ? data.images : (data && data.image ? [data.image] : []);
 
         if (imageUrls.length > 0) {
-            sliderContainer.style.display = 'block';
-            noTxt.style.display = 'none';
-            createStatusSlider(sliderContainer, imageUrls, true);
+            currentViewerImages = imageUrls.map((url, index) => ({ id: 'status_' + index, image: url }));
+            currentViewerIndex = 0;
+
+            imageViewerModal.style.display = 'flex';
+            updateImageViewer();
+
+            const editBtn = document.getElementById('viewerEditBtn');
+            if (editBtn) editBtn.style.display = 'none';
+
+            const forwardBtn = document.getElementById('viewerForwardBtn');
+            if (forwardBtn) forwardBtn.style.display = 'none';
+
+            const prevBtn = document.getElementById('viewerPrevBtn');
+            const nextBtn = document.getElementById('viewerNextBtn');
+            if (prevBtn) prevBtn.style.display = 'flex';
+            if (nextBtn) nextBtn.style.display = 'flex';
+
+            viewerScale = 1;
+            viewerTranslateX = 0;
+            viewerTranslateY = 0;
+            updateViewerTransform();
+            
+            const v = document.getElementById('viewerVideoElement');
+            if(v) {
+                v.style.display = 'none';
+                v.pause();
+            }
+            viewerImage.style.display = 'block';
         } else {
-            sliderContainer.style.display = 'none';
-            noTxt.style.display = 'block';
+            showToast("No status uploaded yet.");
         }
     });
 }
