@@ -231,7 +231,7 @@ headerLogoutBtn.addEventListener('click', () => {
             display: none; align-items: center; justify-content: space-between; padding: 5px 8px;
             background: rgba(25, 30, 35, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
             border-top: 3px solid rgba(255, 255, 255, 0.08); z-index: 1000; box-sizing: border-box;
-            box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.2); color: white; gap: 5px;
+            box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.2); color: white; gap: 5px; touch-action: none;
         `;
 
         // --- Input Box Layout Restructuring ---
