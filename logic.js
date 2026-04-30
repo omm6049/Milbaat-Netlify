@@ -403,6 +403,92 @@ headerLogoutBtn.addEventListener('click', () => {
     }
 })();
 
+// --- Scroll to Bottom Button Setup ---
+(function setupScrollToBottom() {
+    const style = document.createElement('style');
+    style.innerHTML = `
+        #scrollToBottomBtn {
+            position: fixed;
+            bottom: 80px; /* Just above the 60px footer */
+            right: 15px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(30, 30, 40, 0.85);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            display: none; /* hidden by default */
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 995;
+            transition: background 0.3s;
+            backdrop-filter: blur(5px);
+        }
+        #scrollToBottomBtn:active { transform: scale(0.9); }
+        body.light-mode #scrollToBottomBtn { background: rgba(255, 255, 255, 0.9); color: #333; border-color: rgba(0,0,0,0.1); }
+        
+        #scrollUnreadBadge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: #ff4757;
+            color: white;
+            font-size: 0.7rem;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 10px;
+            display: none;
+            border: 2px solid #1E293B;
+            pointer-events: none;
+        }
+        body.light-mode #scrollUnreadBadge { border-color: #ffffff; }
+    `;
+    document.head.appendChild(style);
+
+    const scrollBtn = document.createElement('div');
+    scrollBtn.id = 'scrollToBottomBtn';
+    scrollBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px;"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>
+        <div id="scrollUnreadBadge">0</div>
+    `;
+    document.body.appendChild(scrollBtn);
+
+    window.scrollUnreadCount = 0;
+    window.updateScrollBadge = function(count) {
+        const badge = document.getElementById('scrollUnreadBadge');
+        if (badge) {
+            window.scrollUnreadCount = count;
+            if (count > 0) {
+                badge.innerText = count > 99 ? '99+' : count;
+                badge.style.display = 'block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    };
+
+    if (chatMessages) {
+        chatMessages.addEventListener('scroll', () => {
+            // Show button if user scrolls up by more than 150px
+            const isScrolledUp = (chatMessages.scrollHeight - chatMessages.scrollTop) > (chatMessages.clientHeight + 150);
+            scrollBtn.style.display = isScrolledUp ? 'flex' : 'none';
+            
+            if (!isScrolledUp && window.scrollUnreadCount > 0) {
+                window.updateScrollBadge(0);
+            }
+        });
+    }
+
+    scrollBtn.addEventListener('click', () => {
+        window.updateScrollBadge(0);
+        if (chatMessages) {
+            chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
+        }
+    });
+})();
+
 // --- Setup Custom Voice Message UI Styles ---
 (function setupVoiceMessageStyle() {
     const style = document.createElement('style');
@@ -2178,6 +2264,8 @@ function updateAlphaUnreadBadges() {
     });
 }
 
+let lastRenderedPartner = null;
+
 function filterAndRenderChat() {
     if (!allMessagesRaw) return;
 
@@ -2215,8 +2303,17 @@ function filterAndRenderChat() {
     });
 
     history.sort((a, b) => (a.rawDate || "") < (b.rawDate || "") ? -1 : 1);
+    
+    let oldHistoryLength = 0;
+    if (lastRenderedPartner === currentChatPartner && currentChatHistory) {
+        oldHistoryLength = currentChatHistory.length;
+    } else {
+        if (typeof window.updateScrollBadge === 'function') window.updateScrollBadge(0);
+    }
+    lastRenderedPartner = currentChatPartner;
+    
     currentChatHistory = history;
-    renderChat(history);
+    renderChat(history, oldHistoryLength);
 }
 
 // --- Chat History Logic ---
@@ -2406,9 +2503,12 @@ function setupFirebaseListeners() {
     }
 }
 
-function renderChat(history) {
+function renderChat(history, oldHistoryLength = 0) {
     let historyChanged = false;
     let lastDateDivider = '';
+
+    const wasScrolledUp = chatMessages.scrollHeight > 0 && (chatMessages.scrollHeight - chatMessages.scrollTop) > (chatMessages.clientHeight + 150);
+    const prevScrollTop = chatMessages.scrollTop;
 
     // Mark messages from the OTHER user as 'seen' when I load them
     history.forEach(msg => {
@@ -2712,7 +2812,24 @@ function renderChat(history) {
         
         chatMessages.appendChild(msgDiv);
     });
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    if (wasScrolledUp) {
+        chatMessages.scrollTop = prevScrollTop;
+        const newMessages = history.length - oldHistoryLength;
+        if (newMessages > 0) {
+            const lastMsg = history[history.length - 1];
+            if (lastMsg && lastMsg.sender === currentUser) {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                if (typeof window.updateScrollBadge === 'function') window.updateScrollBadge(0);
+            } else if (typeof window.updateScrollBadge === 'function') {
+                window.updateScrollBadge((window.scrollUnreadCount || 0) + newMessages);
+            }
+        }
+    } else {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        if (typeof window.updateScrollBadge === 'function') window.updateScrollBadge(0);
+    }
+    
     if (isSelectionMode) updateSelectionHeaderIcons();
 }
 
@@ -4073,6 +4190,33 @@ profileImageDisplay.addEventListener('click', () => {
     }
     profileFileInput.click();
 });
+
+// --- Mobile Keyboard Overlay Fix ---
+function handleViewportResize() {
+    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    document.body.style.height = vh + 'px';
+    
+    if (chatMessages) {
+        chatMessages.style.height = vh + 'px';
+        setTimeout(() => {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }, 50);
+    }
+}
+
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', handleViewportResize);
+} else {
+    window.addEventListener('resize', handleViewportResize);
+}
+
+if (msgInput) {
+    msgInput.addEventListener('focus', () => {
+        setTimeout(() => {
+            if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
+        }, 300);
+    });
+}
 
 // Typing detection
 msgInput.addEventListener('input', () => {
