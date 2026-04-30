@@ -4194,8 +4194,36 @@ profileImageDisplay.addEventListener('click', () => {
 // --- Mobile Keyboard Overlay Fix ---
 function handleViewportResize() {
     const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-    document.body.style.height = vh + 'px';
     
+    // Prevent overall page scroll & rubber-banding completely
+    document.documentElement.style.height = vh + 'px';
+    document.body.style.height = vh + 'px';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    
+    // Adjust Chat Input Bar precisely to sit at the bottom of the visual viewport
+    if (chatInputBar && chatInputBar.style.display !== 'none') {
+        const barHeight = chatInputBar.offsetHeight || 60;
+        chatInputBar.style.bottom = 'auto';
+        chatInputBar.style.top = (vh - barHeight) + 'px';
+    }
+    
+    // Adjust Alpha Nav Footer if it's visible
+    const alphaNav = document.getElementById('alpha-footer-nav');
+    if (alphaNav && alphaNav.style.display !== 'none') {
+        const navHeight = alphaNav.offsetHeight || 67;
+        alphaNav.style.bottom = 'auto';
+        alphaNav.style.top = (vh - navHeight) + 'px';
+    }
+
+    // Adjust Scroll To Bottom Button
+    const scrollBtn = document.getElementById('scrollToBottomBtn');
+    if (scrollBtn) {
+        scrollBtn.style.bottom = 'auto';
+        scrollBtn.style.top = (vh - 120) + 'px';
+    }
+
+    // Keep Chat Messages container correctly sized
     if (chatMessages) {
         chatMessages.style.height = vh + 'px';
         setTimeout(() => {
@@ -4206,13 +4234,18 @@ function handleViewportResize() {
 
 if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', handleViewportResize);
+    window.visualViewport.addEventListener('scroll', handleViewportResize);
 } else {
     window.addEventListener('resize', handleViewportResize);
+    window.addEventListener('scroll', handleViewportResize);
 }
+
+setTimeout(handleViewportResize, 500); // Set initial state
 
 if (msgInput) {
     msgInput.addEventListener('focus', () => {
         setTimeout(() => {
+            handleViewportResize(); // Ensure layout tracks precisely when focused
             if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
         }, 300);
     });
