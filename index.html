@@ -917,7 +917,7 @@
 
         /* Typing Indicator */
         .typing-indicator {
-            position: fixed;
+            position: absolute;
             bottom: 80px;
             left: 20px;
             background: rgba(255, 255, 255, 0.15);
@@ -1432,7 +1432,7 @@
         </div>
         <input type="file" id="chatFileInput" style="display: none;">
         <input type="file" id="chatCameraInput" accept="image/*" capture="environment" style="display: none;">
-        <input type="text" class="chat-input" placeholder="Type a message..." id="msgInput" autocomplete="off">
+        <input type="text" class="chat-input" placeholder="Type a message..." id="msgInput" autocomplete="off" name="chatbox" data-lpignore="true" data-form-type="other">
         <button class="send-btn" id="sendMsgBtn">➤</button>
     </div>
 

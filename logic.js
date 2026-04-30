@@ -157,7 +157,7 @@ headerLogoutBtn.addEventListener('click', () => {
 
     // Style: Full width, fixed top, neutral dark glass background (works for Light/Dark themes)
     header.style.cssText = `
-        position: fixed; top: 0; left: 0; width: 100%; height: 65px;
+        position: absolute; top: 0; left: 0; width: 100%; height: 65px;
         display: flex; align-items: center; justify-content: space-between; padding: 0 10px;
         background: rgba(18, 18, 18, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
         border-bottom: 3px solid rgba(255, 255, 255, 0.08); z-index: 1000; box-sizing: border-box;
@@ -227,7 +227,7 @@ headerLogoutBtn.addEventListener('click', () => {
         // Style: Fixed bottom, full width, glassmorphism with a cool dark slate tint
         // Note: display is set to 'none' initially, toggled to 'flex' on login
         chatInputBar.style.cssText = `
-            position: fixed; bottom: 0; left: 0; width: 100%; height: 60px; 
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 60px; 
             display: none; align-items: center; justify-content: space-between; padding: 5px 8px;
             background: rgba(25, 30, 35, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
             border-top: 3px solid rgba(255, 255, 255, 0.08); z-index: 1000; box-sizing: border-box;
@@ -391,7 +391,7 @@ headerLogoutBtn.addEventListener('click', () => {
                 padding-left: 10px;      /* Left spacing */
                 padding-right: 10px;     /* Right spacing */
                 box-sizing: border-box;  /* Include padding in width/height */
-                position: fixed;         /* Fix position to screen */
+                position: absolute;      /* Absolute to locked body bounds */
                 top: 0;
                 left: 0;
                 z-index: 0;              /* Behind header/footer */
@@ -408,7 +408,7 @@ headerLogoutBtn.addEventListener('click', () => {
     const style = document.createElement('style');
     style.innerHTML = `
         #scrollToBottomBtn {
-            position: fixed;
+            position: absolute;
             bottom: 80px; /* Just above the 60px footer */
             right: 15px;
             width: 40px;
@@ -624,7 +624,7 @@ headerLogoutBtn.addEventListener('click', () => {
 
         /* --- Pinned Message Bar Styles --- */
         #pinnedMessageBar {
-            position: fixed !important;
+            position: absolute !important;
             top: 65px !important;
             left: 0 !important;
             width: 100% !important;
@@ -1343,7 +1343,7 @@ if (!bgImage && bgOverlay) {
     }
 
     header.style.cssText = `
-        position: fixed; top: 0; left: 0; width: 100%; height: 65px;
+        position: absolute; top: 0; left: 0; width: 100%; height: 65px;
         display: none; align-items: center; justify-content: space-between; padding: 0 15px;
         background: #0F172A !important; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
         border-bottom: 2px solid rgb(31, 191, 231) !important; z-index: 1001; box-sizing: border-box;
@@ -3030,6 +3030,13 @@ acceptBtn.addEventListener('click', async (e) => {
         overlay.style.visibility = 'hidden';
         body.style.overflow = 'auto';
         mainContent.style.display = 'flex';
+        
+        // Disable login inputs so mobile browser autofill ignores them during chat
+        if (usernameInput) usernameInput.disabled = true;
+        if (passwordInput) {
+            passwordInput.type = 'text';
+            passwordInput.disabled = true;
+        }
     };
 
     // Check Hardcoded Users
@@ -4200,32 +4207,35 @@ function handleViewportResize() {
     document.body.style.height = vh + 'px';
     document.body.style.position = 'fixed';
     document.body.style.width = '100%';
+    document.body.style.overflow = 'hidden';
     
-    // Adjust Chat Input Bar precisely to sit at the bottom of the visual viewport
+    // Use absolute positioning relative to the rigidly sized body bounds
     if (chatInputBar && chatInputBar.style.display !== 'none') {
-        const barHeight = chatInputBar.offsetHeight || 60;
-        chatInputBar.style.bottom = 'auto';
-        chatInputBar.style.top = (vh - barHeight) + 'px';
+        chatInputBar.style.position = 'absolute';
+        chatInputBar.style.bottom = '0px';
+        chatInputBar.style.top = 'auto';
     }
     
     // Adjust Alpha Nav Footer if it's visible
     const alphaNav = document.getElementById('alpha-footer-nav');
     if (alphaNav && alphaNav.style.display !== 'none') {
-        const navHeight = alphaNav.offsetHeight || 67;
-        alphaNav.style.bottom = 'auto';
-        alphaNav.style.top = (vh - navHeight) + 'px';
+        alphaNav.style.position = 'absolute';
+        alphaNav.style.bottom = '0px';
+        alphaNav.style.top = 'auto';
     }
 
     // Adjust Scroll To Bottom Button
     const scrollBtn = document.getElementById('scrollToBottomBtn');
     if (scrollBtn) {
-        scrollBtn.style.bottom = 'auto';
-        scrollBtn.style.top = (vh - 120) + 'px';
+        scrollBtn.style.position = 'absolute';
+        scrollBtn.style.bottom = '80px';
+        scrollBtn.style.top = 'auto';
     }
 
     // Keep Chat Messages container correctly sized
     if (chatMessages) {
-        chatMessages.style.height = vh + 'px';
+        chatMessages.style.position = 'absolute';
+        chatMessages.style.height = '100%';
         setTimeout(() => {
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }, 50);
@@ -6456,6 +6466,13 @@ confirmLogout.addEventListener('click', () => {
     acceptBtn.style.cursor = 'not-allowed';
     body.style.overflow = 'hidden';
     body.classList.remove('user-alpha', 'user-beta');
+    
+    // Re-enable password fields upon logout
+    if (usernameInput) usernameInput.disabled = false;
+    if (passwordInput) {
+        passwordInput.type = 'password';
+        passwordInput.disabled = false;
+    }
     
     localStorage.removeItem('milbaat_user');
     
