@@ -41,6 +41,10 @@
             justify-content: center;
             align-items: center;
             flex-direction: column;
+            gap: clamp(20px, 4vh, 40px); /* Creates dynamic space between box and footer */
+            padding: 20px 0; /* Safety padding */
+            box-sizing: border-box;
+            overflow-y: auto; /* Allows smooth scrolling if screen is too short */
             transition: opacity 0.8s ease, visibility 0.8s ease;
         }
 
@@ -48,10 +52,10 @@
         .accept-btn {
             background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%);
             border: none;
-            padding: 15px 40px;
+            padding: 12px 40px;
             border-radius: 50px;
             color: white;
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             font-weight: 600;
             letter-spacing: 1px;
             cursor: pointer;
@@ -74,7 +78,7 @@
         .login-input {
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 15px 20px;
+            padding: 12px 20px;
             border-radius: 30px;
             color: rgb(147, 133, 133);
             font-size: 1rem;
@@ -95,8 +99,8 @@
         .error-msg {
             color: #ff6b6b;
             font-size: 0.85rem;
-            margin-top: -10px;
-            margin-bottom: 15px;
+            margin-top: -5px;
+            margin-bottom: 10px;
             width: 80%;
             display: none; /* Hidden by default */
         }
@@ -461,6 +465,43 @@
             color: #007aff;
         }
         
+        /* --- Light Mode Pre-Login & Modal Overrides --- */
+        body.light-mode .login-container {
+            background: rgba(255, 255, 255, 0.9) !important;
+            border-color: #007aff !important;
+            box-shadow: 0 0 20px rgba(0, 122, 255, 0.2) !important;
+        }
+        body.light-mode .login-container h2 { color: #b33939 !important; }
+        body.light-mode .login-container h4 { color: #555 !important; }
+        body.light-mode .login-container span { color: #555 !important; }
+        
+        body.light-mode #login-branding-footer {
+            background: transparent !important;
+            color: #333 !important;
+        }
+        body.light-mode #login-branding-footer div,
+        body.light-mode #login-branding-footer span,
+        body.light-mode #login-branding-footer p { color: #333 !important; }
+        body.light-mode #login-branding-footer span[style*="color: #f1c40f"] { color: #e67e22 !important; }
+        body.light-mode #login-branding-footer p[style*="color: #e74c3c"] { color: #c0392b !important; }
+
+        body.light-mode .numpad-btn { background: rgba(0, 0, 0, 0.05) !important; border-color: rgba(0, 0, 0, 0.1) !important; color: #333 !important; }
+        body.light-mode .numpad-btn:active { background: rgba(0, 122, 255, 0.2) !important; }
+        body.light-mode #numcode-display { background: rgba(0, 0, 0, 0.05) !important; color: #333 !important; }
+        
+        body.light-mode .modal-box { background: rgba(255, 255, 255, 0.95) !important; border-color: rgba(0, 0, 0, 0.1) !important; color: #333 !important; }
+        body.light-mode .modal-box h2, body.light-mode .modal-box h3 { color: #222 !important; }
+        body.light-mode .modal-box span, body.light-mode .modal-box p { color: #555 !important; }
+        body.light-mode .modal-box input { background: rgba(0, 0, 0, 0.05) !important; color: #333 !important; border-color: rgba(0, 0, 0, 0.1) !important; }
+        body.light-mode .modal-box input::placeholder { color: #888 !important; }
+        body.light-mode .modal-box .cancel-btn { background: #e9ecef !important; color: #333 !important; }
+        body.light-mode .close-modal-btn { color: #333 !important; }
+        
+        body.light-mode #forgotPassLink { color: #d63031 !important; }
+        body.light-mode #createUserLink { color: #0984e3 !important; }
+        body.light-mode #numCodeLoginLink { color: #0984e3 !important; }
+        body.light-mode .error-msg { color: #d63031 !important; }
+
         /* --- Light Mode Chat Interface Overrides --- */
         body.light-mode header {
             background: rgba(255, 255, 255, 0.9) !important;
@@ -1005,12 +1046,12 @@
     <div id="entry-overlay">
         <div class="login-container" id="loginMainBox">
             <!-- Branding (Always Visible) -->
-            <div style="text-align: center; margin-bottom: 15px; font-family: 'Cinzel', serif;">
-                <h2 style="margin: 0; font-size: 1.1rem; color: #f1c40f; font-weight: 700; letter-spacing: 1px;">MINISTRY OF DEFENCE</h2>
-                <h4 style="margin: 3px 0 0 0; font-size: 0.65rem; color: rgba(255,255,255,0.8); letter-spacing: 1.5px; text-transform: uppercase;">Government of India</h4>
+            <div style="text-align: center; margin-bottom: 20px; font-family: 'Cinzel', serif;">
+                <h2 style="margin: 0; font-size: 1.2rem; color: #f1c40f; font-weight: 700; letter-spacing: 1px;">MINISTRY OF DEFENCE</h2>
+                <h4 style="margin: 5px 0 0 0; font-size: 0.7rem; color: rgba(255,255,255,0.8); letter-spacing: 1.5px; text-transform: uppercase;">Government of India</h4>
             </div>
 
-            <img id="landingLogo" src="Mil%20Baat%20Logo.png" alt="Mil Baat Logo" style="width: 100px; margin-bottom: 20px; border-radius: 50%; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+            <img id="landingLogo" src="Mil%20Baat%20Logo.png" alt="Mil Baat Logo" style="width: 90px; margin-bottom: 25px; border-radius: 50%; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
 
             <!-- Traditional Login View -->
             <div id="user-pass-view" style="display: flex; width: 100%; flex-direction: column; align-items: center;">

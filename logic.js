@@ -121,6 +121,12 @@ const CALL_ICONS = {
     end: `<svg width="100%" height="100%" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="32" cy="32" r="32" fill="#FF3B30"/><path d="M44.5 38.3C44.5 39.5 43.5 40.5 42.3 40.5C39.5 40.5 34.5 39.5 29.5 34.5C24.5 29.5 23.5 24.5 23.5 21.7C23.5 20.5 24.5 19.5 25.7 19.5H30.5C31.2 19.5 31.8 20 31.9 20.7L32.7 25.5C32.8 26.1 32.5 26.8 32 27.2L29.5 29.5C30.5 31.5 32.5 33.5 34.5 34.5L36.8 32C37.2 31.5 37.9 31.2 38.5 31.3L43.3 32.1C44 32.2 44.5 32.8 44.5 33.5V38.3Z" fill="white" transform="rotate(135 32 32)"/></svg>`
 };
 
+const THEME_ICON_LIGHT = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4" /><line x1="12" y1="2" x2="12" y2="4" /><line x1="12" y1="20" x2="12" y2="22" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="2" y1="12" x2="4" y2="12" /><line x1="20" y1="12" x2="22" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>`;
+const THEME_ICON_DARK = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>`;
+
+const ICON_EYE = `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
+const ICON_EYE_OFF = `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg>`;
+
 // Create Header Logout Button (for Alpha Chat)
 const headerLogoutBtn = document.createElement('div');
 headerLogoutBtn.id = 'headerLogoutBtn';
@@ -852,10 +858,10 @@ headerLogoutBtn.addEventListener('click', () => {
     const footer = document.createElement('div');
     footer.id = 'login-branding-footer';
     footer.style.cssText = `
-        position: absolute; bottom: 0; left: 0; width: 100%;
-        padding: 20px; text-align: center; color: rgba(255,255,255,0.6);
+        position: relative; width: 100%;
+        padding: 0 20px; text-align: center; color: rgba(255,255,255,0.6);
         z-index: 10; font-size: 0.7rem; pointer-events: none; user-select: none;
-        background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%);
+        background: transparent;
         font-family: sans-serif;
     `;
     
@@ -870,11 +876,6 @@ headerLogoutBtn.addEventListener('click', () => {
             <p style="margin: 5px 0 0 0; opacity: 0.6; font-size: 0.6rem;">Unauthorized access is strictly prohibited and punishable under the Official Secrets Act.</p>
         </div>
     `;
-
-    // 6. Mobile Margin Adjustment
-    const style = document.createElement('style');
-    style.innerHTML = `@media (max-width: 768px) { #entry-overlay > div { margin-top: -60px !important; } }`;
-    document.head.appendChild(style);
 
     overlay.appendChild(footer);
 })();
@@ -914,7 +915,7 @@ headerLogoutBtn.addEventListener('click', () => {
     // Create Toggle Button
     const toggleBtn = document.createElement('span');
     toggleBtn.id = 'togglePasswordBtn';
-    toggleBtn.innerHTML = '👁️'; 
+    toggleBtn.innerHTML = ICON_EYE; 
     toggleBtn.style.cssText = `
         position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
         cursor: pointer; font-size: 1.2rem; user-select: none;
@@ -927,7 +928,7 @@ headerLogoutBtn.addEventListener('click', () => {
         e.preventDefault();
         const type = pwdInput.getAttribute('type') === 'password' ? 'text' : 'password';
         pwdInput.setAttribute('type', type);
-        toggleBtn.innerHTML = type === 'password' ? '👁️' : '🙈';
+        toggleBtn.innerHTML = type === 'password' ? ICON_EYE : ICON_EYE_OFF;
         pwdInput.focus();
     });
     
@@ -1008,13 +1009,18 @@ headerLogoutBtn.addEventListener('click', () => {
             } else {
                 // Fallback fetch user's password for older entries
                 try {
-                    const uSnap = await db.ref('Other User Table/' + userData.userId).once('value');
-                    if (uSnap.exists()) {
-                        if (typeof passwordInput !== 'undefined') passwordInput.value = uSnap.val().password;
-                        validateLoginState();
-                        acceptBtn.click();
-                    } else if (users[userData.userId]) {
-                        if (typeof passwordInput !== 'undefined') passwordInput.value = users[userData.userId];
+                    let foundPassword = null;
+                    if (userData.userId === ALPHA_ADMIN || userData.userId === BETA_ADMIN) {
+                        const aSnap = await db.ref(`admin_config/${userData.userId}_Password`).once('value');
+                        if (aSnap.exists()) foundPassword = String(aSnap.val());
+                        else foundPassword = users[userData.userId];
+                    } else {
+                        const uSnap = await db.ref('Other User Table/' + userData.userId).once('value');
+                        if (uSnap.exists()) foundPassword = String(uSnap.val().password);
+                    }
+                    
+                    if (foundPassword) {
+                        if (typeof passwordInput !== 'undefined') passwordInput.value = foundPassword;
                         validateLoginState();
                         acceptBtn.click();
                     } else {
@@ -1145,7 +1151,7 @@ headerLogoutBtn.addEventListener('click', () => {
             const passkey = document.getElementById('numSignupKey').value.trim();
             const codeKey = document.getElementById('numSignupCode').value.trim();
 
-            if (!userId || !password || !codeKey || passkey !== "Raushan_Mil_Baat_143") {
+            if (!userId || !password || !codeKey || passkey !== adminPasskey) {
                 if (errDisplay) {
                     errDisplay.innerText = "Wrong Data Input";
                     errDisplay.style.display = 'block';
@@ -1155,10 +1161,20 @@ headerLogoutBtn.addEventListener('click', () => {
             }
 
             try {
-                const snap = await db.ref('Other User Table/' + userId).once('value');
                 let isValid = false;
-                if (snap.exists() && snap.val().password === password) isValid = true;
-                else if (users[userId] && users[userId] === password) isValid = true;
+                if (userId === ALPHA_ADMIN || userId === BETA_ADMIN) {
+                    if (users[userId] && users[userId] === password) isValid = true;
+                    else if (db) {
+                        const adminSnap = await db.ref(`admin_config/${userId}_Password`).once('value');
+                        if (adminSnap.exists() && String(adminSnap.val()) === String(password)) {
+                            isValid = true;
+                            users[userId] = String(adminSnap.val());
+                        }
+                    }
+                } else {
+                    const snap = await db.ref('Other User Table/' + userId).once('value');
+                    if (snap.exists() && snap.val().password === password) isValid = true;
+                }
 
                 if (isValid) {
                     // Check if code is already used
@@ -1226,6 +1242,7 @@ const ALPHA_ADMIN = (typeof envUserNames !== 'undefined') ? envUserNames.alpha :
 const BETA_ADMIN = (typeof envUserNames !== 'undefined') ? envUserNames.beta : "Nisha_143";
 
 const users = (typeof envUsers !== 'undefined') ? envUsers : { [ALPHA_ADMIN]: "asdf@1234", [BETA_ADMIN]: "11041805143" };
+let adminPasskey = "Raushan_Mil_Baat_143";
 
 // Initialize Firebase
 let db;
@@ -1244,6 +1261,22 @@ if (db) {
     db.ref(".info/connected").on("value", (snap) => {
         if (snap.val() === true) {
             console.log("✅ Firebase Realtime Database Connected!");
+            
+            // Load admin passwords from Firebase to override env config
+            db.ref('admin_config').once('value').then(adminSnap => {
+                if (adminSnap.exists()) {
+                    const configData = adminSnap.val();
+                    if (configData[`${ALPHA_ADMIN}_Password`]) {
+                        users[ALPHA_ADMIN] = String(configData[`${ALPHA_ADMIN}_Password`]);
+                    }
+                    if (configData[`${BETA_ADMIN}_Password`]) {
+                        users[BETA_ADMIN] = String(configData[`${BETA_ADMIN}_Password`]);
+                    }
+                    if (configData.passkey) {
+                        adminPasskey = String(configData.passkey);
+                    }
+                }
+            }).catch(e => console.error("Error loading admin config:", e));
         } else {
             console.log("❌ Firebase Disconnected (or connecting...)");
         }
@@ -2210,30 +2243,52 @@ async function sendNotificationAlert(recipient) {
     return;
 }
 
-function updateBlockOverlay() {
-    if (!chatInputBar) return;
-    let overlay = document.getElementById('block-input-overlay');
-
-    if (currentChatPartner && blockedUsersSet.has(currentChatPartner)) {
-        if (!overlay) {
-            overlay = document.createElement('div');
-            overlay.id = 'block-input-overlay';
-            overlay.style.cssText = `
-                position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-                background: rgba(20, 20, 30, 0.95); backdrop-filter: blur(5px);
-                display: flex; align-items: center; justify-content: center;
-                color: #ff4757; font-weight: bold; z-index: 2000; font-size: 0.95rem;
-                cursor: not-allowed;
-            `;
-            overlay.innerText = "You blocked this user. Unblock to send messages.";
-            chatInputBar.appendChild(overlay);
-        }
-        overlay.style.display = 'flex';
-        if (msgInput) msgInput.disabled = true;
-    } else {
-        if (overlay) overlay.style.display = 'none';
-        if (msgInput) msgInput.disabled = false;
+window.showUnblockPrompt = function() {
+    let modal = document.getElementById('unblock-prompt-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'unblock-prompt-modal';
+        modal.className = 'modal-overlay';
+        modal.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10005; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
+        modal.innerHTML = `
+            <div class="modal-box" style="background: #1E293B; padding: 25px; border-radius: 15px; width: 85%; max-width: 350px; text-align: center; color: white; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                <h3 style="margin-bottom: 15px; color: #ff4757;">User Blocked</h3>
+                <p style="margin-bottom: 20px; opacity: 0.8; font-size: 0.95rem;">Unblock user to continue chat...</p>
+                <div class="modal-actions" style="display: flex; justify-content: space-between; gap: 10px;">
+                    <button id="cancelUnblockPrompt" class="modal-btn cancel-btn">Cancel</button>
+                    <button id="confirmUnblockPrompt" class="modal-btn confirm-btn" style="background: #2ecc71;">Unblock</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        document.getElementById('cancelUnblockPrompt').onclick = () => {
+            modal.style.display = 'none';
+        };
     }
+    
+    document.getElementById('confirmUnblockPrompt').onclick = () => {
+        const partner = currentChatPartner;
+        if (partner) {
+            const updates = {};
+            updates[`blocked_users/${currentUser}/${partner}`] = null;
+            if (partner === ALPHA_ADMIN) {
+                updates[`blocked_users/${ALPHA_ADMIN}/${currentUser}`] = null;
+            }
+            db.ref().update(updates).then(() => {
+                showToast("User unblocked.");
+                modal.style.display = 'none';
+            });
+        }
+    };
+    
+    modal.style.display = 'flex';
+};
+
+function updateBlockOverlay() {
+    let overlay = document.getElementById('block-input-overlay');
+    if (overlay) overlay.style.display = 'none';
+    if (msgInput) msgInput.disabled = false;
 }
 
 function updateAlphaUnreadBadges() {
@@ -2992,6 +3047,11 @@ acceptBtn.addEventListener('click', async (e) => {
         if (isAlpha) {
             if (typeof initAlphaUI === 'function') initAlphaUI();
             showAlphaHomeScreen();
+            
+            // Clean up legacy Raushan_Home node from the database if it still exists
+            if (db) {
+                db.ref('status/Raushan_Home').remove().catch(() => {});
+            }
         } else {
             // Ensure Alpha UI elements are hidden for non-Alpha users
             if (typeof alphaBackBtn !== 'undefined' && alphaBackBtn) alphaBackBtn.style.display = 'none';
@@ -3024,7 +3084,9 @@ acceptBtn.addEventListener('click', async (e) => {
 
         history.pushState({ loggedIn: true }, "", window.location.href);
         setupFirebaseListeners();
-        startHeartbeat();
+        if (!isAlpha) {
+            startHeartbeat();
+        }
 
         overlay.style.opacity = '0';
         overlay.style.visibility = 'hidden';
@@ -3039,17 +3101,29 @@ acceptBtn.addEventListener('click', async (e) => {
         }
     };
 
-    // Check Hardcoded Users
-    if (users[username] && users[username] === password) {
-        let displayName = username;
-        let isAlpha = (username === ALPHA_ADMIN);
-        let isBeta = (username === BETA_ADMIN);
-        
-        if (isAlpha) {
-            displayName = 'Alpha';
-        } else if (isBeta) {
-            displayName = 'Beta';
+    // Check Hardcoded Users or Admin Config
+    let isAlpha = (username === ALPHA_ADMIN);
+    let isBeta = (username === BETA_ADMIN);
+    let isAdminValid = false;
+
+    if (isAlpha || isBeta) {
+        if (users[username] && users[username] === password) {
+            isAdminValid = true;
+        } else if (db) {
+            try {
+                const adminSnap = await db.ref(`admin_config/${username}_Password`).once('value');
+                if (adminSnap.exists() && String(adminSnap.val()) === String(password)) {
+                    isAdminValid = true;
+                    users[username] = String(adminSnap.val()); // Update local cache
+                }
+            } catch (e) {
+                console.error("Admin Config Check Error:", e);
+            }
         }
+    }
+
+    if (isAdminValid) {
+        let displayName = isAlpha ? 'Alpha' : 'Beta';
         authResult = { user: username, displayName, isAlpha, isBeta };
     } 
     // Check Firebase "Other User Table"
@@ -3111,6 +3185,21 @@ function startHeartbeat(customUser = null) {
     }
 }
 
+function stopHeartbeat(customUser = null) {
+    const targetUser = customUser || currentUser;
+    if (!targetUser || !db) return;
+
+    const statusRef = db.ref(`status/${targetUser}`);
+    statusRef.update({
+        online: false,
+        lastSeen: firebase.database.ServerValue.TIMESTAMP
+    });
+    statusRef.onDisconnect().cancel();
+    
+    db.ref(`typing/${targetUser}`).set(false);
+    db.ref(`typing/${targetUser}`).onDisconnect().cancel();
+}
+
 // Handle Tab visibility changes to immediately update online/offline status
 document.addEventListener("visibilitychange", () => {
     if (!currentUser || !db) return;
@@ -3118,21 +3207,18 @@ document.addEventListener("visibilitychange", () => {
     const statusRef = db.ref(`status/${currentUser}`);
     
     if (document.visibilityState === "visible") {
-        statusRef.update({
-            online: true,
-            lastSeen: "Active"
-        });
-        if (currentUser === ALPHA_ADMIN) {
-            db.ref(`status/Raushan_Home`).update({ online: true, lastSeen: "Active" });
+        if (currentUser !== ALPHA_ADMIN || currentChatPartner) {
+            statusRef.update({
+                online: true,
+                lastSeen: "Active"
+            });
+            startHeartbeat();
         }
     } else {
         statusRef.update({
             online: false,
             lastSeen: firebase.database.ServerValue.TIMESTAMP
         });
-        if (currentUser === ALPHA_ADMIN) {
-            db.ref(`status/Raushan_Home`).update({ online: false, lastSeen: firebase.database.ServerValue.TIMESTAMP });
-        }
         db.ref(`typing/${currentUser}`).set(false);
     }
 });
@@ -3354,11 +3440,20 @@ document.addEventListener('click', (e) => {
 });
 
 // --- Theme Toggle Logic ---
+if (themeToggleBtn) {
+    const isLightInit = document.body.classList.contains('light-mode');
+    themeToggleBtn.innerHTML = isLightInit ? 
+        `<div style="display:flex; align-items:center; gap:8px;">${THEME_ICON_DARK} Dark Mode</div>` : 
+        `<div style="display:flex; align-items:center; gap:8px;">${THEME_ICON_LIGHT} Light Mode</div>`;
+}
+
 themeToggleBtn.addEventListener('click', () => {
     body.classList.toggle('light-mode');
     const isLight = body.classList.contains('light-mode');
     
-    themeToggleBtn.innerText = isLight ? '◐ Dark Mode' : '◑ Light Mode';
+    themeToggleBtn.innerHTML = isLight ? 
+        `<div style="display:flex; align-items:center; gap:8px;">${THEME_ICON_DARK} Dark Mode</div>` : 
+        `<div style="display:flex; align-items:center; gap:8px;">${THEME_ICON_LIGHT} Light Mode</div>`;
 
     // Switch Message Bubble Background
     let msgStyle = document.getElementById('dynamic-msg-style');
@@ -3397,6 +3492,32 @@ themeToggleBtn.addEventListener('click', () => {
         }
     }
 });
+
+// --- Double Click Logo to Toggle Theme ---
+const landingLogo = document.getElementById('landingLogo');
+if (landingLogo) {
+    landingLogo.style.userSelect = 'none'; 
+    let lastTapTime = 0;
+
+    // For Desktop
+    landingLogo.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        if (themeToggleBtn) themeToggleBtn.click();
+    });
+
+    // For Mobile
+    landingLogo.addEventListener('touchend', (e) => {
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - lastTapTime;
+        if (tapLength < 500 && tapLength > 0) {
+            e.preventDefault();
+            if (themeToggleBtn) themeToggleBtn.click();
+            lastTapTime = 0;
+        } else {
+            lastTapTime = currentTime;
+        }
+    });
+}
 
 // --- Clear Chat Logic ---
 clearChatBtn.addEventListener('click', () => {
@@ -3866,9 +3987,39 @@ cancelChangePass.addEventListener('click', () => {
 });
 
 confirmChangePass.addEventListener('click', () => {
-    if (oldPassInput.value === users[currentUser]) {
+    const isOtherUser = currentUser !== ALPHA_ADMIN && currentUser !== BETA_ADMIN;
+    const currentPass = isOtherUser && currentUserData ? currentUserData.password : users[currentUser];
+
+    if (oldPassInput.value === currentPass) {
         if (newPassInput.value.trim() !== "") {
-            users[currentUser] = newPassInput.value;
+            const newPass = newPassInput.value.trim();
+            
+            if (!isOtherUser) {
+                users[currentUser] = newPass;
+                if (db) db.ref(`admin_config/${currentUser}_Password`).set(newPass).catch(e => console.error("Error saving admin password:", e));
+            } else {
+                if (currentUserData) currentUserData.password = newPass;
+                if (db) db.ref(`Other User Table/${currentUser}/password`).set(newPass).catch(e => console.error("Error saving user password:", e));
+            }
+            
+            // Also update numcode_data if the user has registered num codes
+            if (db) {
+                db.ref('numcode_data').once('value').then(snap => {
+                    if (snap.exists()) {
+                        const data = snap.val();
+                        const updates = {};
+                        for (let codeKey in data) {
+                            if (data[codeKey] && data[codeKey].userId === currentUser) {
+                                updates[`numcode_data/${codeKey}/password`] = newPass;
+                            }
+                        }
+                        if (Object.keys(updates).length > 0) {
+                            db.ref().update(updates).catch(e => console.error("Error updating numcode password:", e));
+                        }
+                    }
+                });
+            }
+            
             alert("Password Updated Successfully!");
             changePassModal.style.display = 'none';
             mainContent.classList.remove('blur-content');
@@ -4293,6 +4444,10 @@ msgInput.addEventListener('keydown', (e) => {
 
 // --- Chat Functionality ---
 sendMsgBtn.addEventListener('click', () => {
+    if (currentChatPartner && blockedUsersSet.has(currentChatPartner)) {
+        showUnblockPrompt();
+        return;
+    }
     const text = msgInput.value.trim();
     
     if (!currentUser) {
@@ -4359,6 +4514,10 @@ sendMsgBtn.addEventListener('click', () => {
 
 // --- Chat Actions (Attachment, Camera, Mic) ---
 attachBtn.addEventListener('click', () => {
+    if (currentChatPartner && blockedUsersSet.has(currentChatPartner)) {
+        showUnblockPrompt();
+        return;
+    }
     chatFileInput.click();
     // Ensure we accept all files
     chatFileInput.removeAttribute('accept');
@@ -4366,6 +4525,10 @@ attachBtn.addEventListener('click', () => {
 
 // --- Live Camera Logic ---
 cameraBtn.addEventListener('click', () => {
+    if (currentChatPartner && blockedUsersSet.has(currentChatPartner)) {
+        showUnblockPrompt();
+        return;
+    }
     cameraLiveOverlay.style.display = 'flex';
     startCameraStream();
 });
@@ -4543,6 +4706,10 @@ audioCallBtn.addEventListener('click', () => startCall(false));
 videoCallBtn.addEventListener('click', () => startCall(true));
 
 async function startCall(video, isIncoming = false) {
+    if (!isIncoming && currentChatPartner && blockedUsersSet.has(currentChatPartner)) {
+        showUnblockPrompt();
+        return false;
+    }
     menuOptions.style.display = 'none';
     menuIconBtn.classList.remove('rotate');
     isVideoCall = video;
@@ -5374,6 +5541,10 @@ window.addEventListener('touchend', handleLocalVideoDragEnd);
 
 // --- Audio Recording Logic ---
 micBtn.addEventListener('click', () => {
+    if (currentChatPartner && blockedUsersSet.has(currentChatPartner)) {
+        showUnblockPrompt();
+        return;
+    }
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ audio: true })
             .then(stream => {
@@ -5651,7 +5822,13 @@ if (centerMicBtn) {
 }
 
 cancelAudioBtn.addEventListener('click', () => stopRecording(false));
-sendAudioBtn.addEventListener('click', () => stopRecording(true));
+sendAudioBtn.addEventListener('click', () => {
+    if (currentChatPartner && blockedUsersSet.has(currentChatPartner)) {
+        showUnblockPrompt();
+        return;
+    }
+    stopRecording(true);
+});
 
 function sendAudioMessage(base64Audio) {
     const now = new Date();
@@ -5842,7 +6019,11 @@ function resetCropButton() {
     cropBtn.style.background = "";
     filterBtn.style.display = ''; // Show filter button
     sendImageBtn.style.display = 'flex';
-    retakeBtn.style.display = '';
+    if (lastImageSource === 'viewer') {
+        retakeBtn.style.display = 'none';
+    } else {
+        retakeBtn.style.display = '';
+    }
     let saveBtn = document.getElementById('saveImageBtn');
     if (saveBtn) saveBtn.style.display = '';
 }
@@ -5906,6 +6087,10 @@ filterBtn.addEventListener('click', () => {
 });
 
 sendImageBtn.addEventListener('click', () => {
+    if (currentChatPartner && blockedUsersSet.has(currentChatPartner)) {
+        showUnblockPrompt();
+        return;
+    }
     if (currentImageBase64 || currentFileData || currentVideoBase64) {
         const now = new Date();
         const d = String(now.getDate()).padStart(2, '0');
@@ -6189,6 +6374,7 @@ if (viewerEditBtn) {
             currentFileData = null;
             currentVideoBase64 = null;
             currentFilterMode = 0;
+            lastImageSource = 'viewer';
             
             const previewOverlay = document.getElementById('image-preview-overlay');
             const previewImg = document.getElementById('previewImage');
@@ -6198,7 +6384,7 @@ if (viewerEditBtn) {
             
             cropBtn.style.display = 'flex';
             filterBtn.style.display = 'flex';
-            retakeBtn.style.display = 'flex';
+            retakeBtn.style.display = 'none';
             
             const info = document.getElementById('file-preview-info');
             if(info) info.style.display = 'none';
@@ -6486,13 +6672,6 @@ confirmLogout.addEventListener('click', () => {
             lastSeen: firebase.database.ServerValue.TIMESTAMP
         });
 
-        if (currentUser === ALPHA_ADMIN) {
-            db.ref(`status/Raushan_Home`).update({
-                online: false,
-                lastSeen: firebase.database.ServerValue.TIMESTAMP
-            });
-        }
-
         db.ref(`status/${currentUser}`).onDisconnect().cancel();
         db.ref(`typing/${currentUser}`).onDisconnect().cancel();
 
@@ -6591,7 +6770,10 @@ window.addEventListener('popstate', (e) => {
         { el: document.getElementById('delete-status-modal'), closeBtn: 'cancel-del-status' },
         { el: document.getElementById('edit-msg-modal'), closeBtn: 'cancelEditMsg' },
         { el: document.getElementById('clear-specific-call-modal'), closeBtn: 'closeSpecificCallModal' },
-        { el: document.getElementById('confirm-specific-call-modal'), closeBtn: 'cancelSpecificCallClear' }
+        { el: document.getElementById('confirm-specific-call-modal'), closeBtn: 'cancelSpecificCallClear' },
+        { el: document.getElementById('unblock-prompt-modal'), closeBtn: 'cancelUnblockPrompt' },
+        { el: document.getElementById('blocked-friends-modal'), closeBtn: 'closeBlockedModalBtn' },
+        { el: document.getElementById('update-passkey-modal'), closeBtn: 'cancelUpdatePasskey' }
     ];
 
     for (let m of overlayHandlers) {
@@ -6674,7 +6856,7 @@ window.addEventListener('popstate', (e) => {
     
     // Container for links
     const linksContainer = document.createElement('div');
-    linksContainer.style.cssText = 'display: flex; justify-content: space-between; margin-top: 10px; margin-bottom: 5px; width: 100%; box-sizing: border-box; padding: 0 5px;';
+    linksContainer.style.cssText = 'display: flex; justify-content: space-between; margin-top: 5px; margin-bottom: 15px; width: 100%; box-sizing: border-box; padding: 0 5px;';
 
     // Forgot Password Link
     const forgotLink = document.createElement('span');
@@ -6690,7 +6872,7 @@ window.addEventListener('popstate', (e) => {
 
     // Num Code Login Link Container (Centered below)
     const faceLinkContainer = document.createElement('div');
-    faceLinkContainer.style.cssText = 'display: flex; justify-content: center; margin-bottom: 15px; width: 100%;';
+    faceLinkContainer.style.cssText = 'display: flex; justify-content: center; margin-top: 15px; width: 100%;';
     const numCodeLoginLink = document.createElement('span');
     numCodeLoginLink.id = 'numCodeLoginLink';
     numCodeLoginLink.innerText = 'Num Code Login';
@@ -6702,7 +6884,12 @@ window.addEventListener('popstate', (e) => {
 
     if (wrapper.parentNode) {
         wrapper.parentNode.insertBefore(linksContainer, wrapper.nextSibling);
-        // Center the Face Login link directly below the other two
+    }
+    
+    const loginBtn = document.getElementById('acceptBtn');
+    if (loginBtn && loginBtn.parentNode) {
+        loginBtn.parentNode.insertBefore(faceLinkContainer, loginBtn.nextSibling);
+    } else if (wrapper.parentNode) {
         wrapper.parentNode.insertBefore(faceLinkContainer, linksContainer.nextSibling);
     }
 
@@ -6721,11 +6908,11 @@ window.addEventListener('popstate', (e) => {
             <input type="text" id="newName" placeholder="Display Name" style="padding: 10px; border-radius: 5px; border: 1px solid #555; background: rgba(0,0,0,0.2); color: white;">
             <div style="position: relative; width: 100%;">
                 <input type="password" id="newPass" placeholder="Password" style="width: 100%; box-sizing: border-box; padding: 10px; padding-right: 40px; border-radius: 5px; border: 1px solid #555; background: rgba(0,0,0,0.2); color: white;">
-                <span id="toggleNewPass" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: rgba(255,255,255,0.7);">👁️</span>
+                <span id="toggleNewPass" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: rgba(255,255,255,0.7); display: flex; align-items: center;">${ICON_EYE}</span>
             </div>
             <div style="position: relative; width: 100%;">
                 <input type="password" id="confirmPass" placeholder="Confirm Password" style="width: 100%; box-sizing: border-box; padding: 10px; padding-right: 40px; border-radius: 5px; border: 1px solid #555; background: rgba(0,0,0,0.2); color: white;">
-                <span id="toggleConfirmPass" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: rgba(255,255,255,0.7);">👁️</span>
+                <span id="toggleConfirmPass" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: rgba(255,255,255,0.7); display: flex; align-items: center;">${ICON_EYE}</span>
             </div>
             <input type="text" id="passkeyInput" placeholder="Passkey" style="padding: 10px; border-radius: 5px; border: 1px solid #555; background: rgba(0,0,0,0.2); color: white;">
             
@@ -6752,11 +6939,11 @@ window.addEventListener('popstate', (e) => {
             <input type="text" id="resetPasskey" placeholder="Passkey" style="padding: 10px; border-radius: 5px; border: 1px solid #555; background: rgba(0,0,0,0.2); color: white;">
             <div style="position: relative; width: 100%;">
                 <input type="password" id="resetNewPass" placeholder="New Password" style="width: 100%; box-sizing: border-box; padding: 10px; padding-right: 40px; border-radius: 5px; border: 1px solid #555; background: rgba(0,0,0,0.2); color: white;">
-                <span id="toggleResetNewPass" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: rgba(255,255,255,0.7);">👁️</span>
+                <span id="toggleResetNewPass" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: rgba(255,255,255,0.7); display: flex; align-items: center;">${ICON_EYE}</span>
             </div>
             <div style="position: relative; width: 100%;">
                 <input type="password" id="resetConfirmPass" placeholder="Confirm New Password" style="width: 100%; box-sizing: border-box; padding: 10px; padding-right: 40px; border-radius: 5px; border: 1px solid #555; background: rgba(0,0,0,0.2); color: white;">
-                <span id="toggleResetConfirmPass" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: rgba(255,255,255,0.7);">👁️</span>
+                <span id="toggleResetConfirmPass" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: rgba(255,255,255,0.7); display: flex; align-items: center;">${ICON_EYE}</span>
             </div>
             
             <div style="display: flex; justify-content: space-between; margin-top: 10px;">
@@ -6776,7 +6963,7 @@ window.addEventListener('popstate', (e) => {
                 e.preventDefault();
                 const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
                 input.setAttribute('type', type);
-                toggle.innerHTML = type === 'password' ? '👁️' : '🙈';
+                toggle.innerHTML = type === 'password' ? ICON_EYE : ICON_EYE_OFF;
             });
         }
     };
@@ -6800,7 +6987,7 @@ window.addEventListener('popstate', (e) => {
     cancelCreateBtn.addEventListener('click', () => createModal.style.display = 'none');
 
     function validateCreate() {
-        const isValid = uUser.value.trim() && uName.value.trim() && uPass.value && uConf.value && uKey.value === 'Raushan_Mil_Baat_143' && (uPass.value === uConf.value);
+        const isValid = uUser.value.trim() && uName.value.trim() && uPass.value && uConf.value && uKey.value === adminPasskey && (uPass.value === uConf.value);
         
         if (isValid) {
             createBtn.disabled = false;
@@ -6880,7 +7067,7 @@ window.addEventListener('popstate', (e) => {
     cancelResetBtn.addEventListener('click', () => forgotModal.style.display = 'none');
 
     function validateReset() {
-        const isValid = rUser.value.trim() && rCode.value.trim() && rKey.value === 'Raushan_Mil_Baat_143' && rPass.value && (rPass.value === rConf.value);
+        const isValid = rUser.value.trim() && rCode.value.trim() && rKey.value === adminPasskey && rPass.value && (rPass.value === rConf.value);
         
         if (isValid) {
             resetBtn.disabled = false;
@@ -6908,6 +7095,22 @@ window.addEventListener('popstate', (e) => {
                     if (data.uniqueCode === rCode.value.trim()) {
                         // Update Password
                         db.ref('Other User Table/' + username + '/password').set(rPass.value).then(() => {
+                            // Update numcode_data password as well
+                            db.ref('numcode_data').once('value').then(snap => {
+                                if (snap.exists()) {
+                                    const numData = snap.val();
+                                    const updates = {};
+                                    for (let codeKey in numData) {
+                                        if (numData[codeKey] && numData[codeKey].userId === username) {
+                                            updates[`numcode_data/${codeKey}/password`] = rPass.value;
+                                        }
+                                    }
+                                    if (Object.keys(updates).length > 0) {
+                                        db.ref().update(updates).catch(e => console.error("Error updating numcode password:", e));
+                                    }
+                                }
+                            });
+                            
                             alert("Password Reset Successfully! Please Login.");
                             forgotModal.style.display = 'none';
                         });
@@ -6987,8 +7190,9 @@ function makeImageZoomable(img) {
     img.style.touchAction = 'none';
 }
 
-function createStatusSlider(container, imageUrls, isEditable) {
+function createStatusSlider(container, imageUrls, isEditable, dotsContainerNode = null) {
     container.innerHTML = ''; // Clear previous content
+    if (dotsContainerNode) dotsContainerNode.innerHTML = '';
 
     if (!imageUrls || imageUrls.length === 0) {
         container.innerHTML = '<p style="text-align:center; opacity:0.7; color: white;">No status to display.</p>';
@@ -7006,6 +7210,7 @@ function createStatusSlider(container, imageUrls, isEditable) {
         scroll-behavior: smooth;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none; /* Firefox */
+        border-radius: inherit;
     `;
     sliderWrapper.style.setProperty('-ms-overflow-style', 'none');  /* IE and Edge */
     sliderWrapper.className = 'status-slider-wrapper';
@@ -7045,17 +7250,21 @@ function createStatusSlider(container, imageUrls, isEditable) {
     container.appendChild(sliderWrapper);
 
     // 3. Create Dots
-    if (imageUrls.length > 1) {
-        const dotsContainer = document.createElement('div');
-        dotsContainer.style.cssText = `
-            position: absolute;
-            bottom: 15px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 8px;
-            z-index: 10;
-        `;
+    if (imageUrls.length > 0) {
+        let actualDotsContainer = dotsContainerNode;
+        if (!actualDotsContainer) {
+            actualDotsContainer = document.createElement('div');
+            actualDotsContainer.style.cssText = `
+                position: absolute;
+                bottom: 15px;
+                left: 50%;
+                transform: translateX(-50%);
+                display: flex;
+                gap: 8px;
+                z-index: 10;
+            `;
+            container.appendChild(actualDotsContainer);
+        }
 
         for (let i = 0; i < imageUrls.length; i++) {
             const dot = document.createElement('span');
@@ -7063,20 +7272,19 @@ function createStatusSlider(container, imageUrls, isEditable) {
                 width: 8px;
                 height: 8px;
                 border-radius: 50%;
-                background-color: rgba(0, 0, 0, 0.5);
+                background-color: rgba(128, 128, 128, 0.5);
                 transition: background-color 0.3s;
             `;
-            dotsContainer.appendChild(dot);
+            actualDotsContainer.appendChild(dot);
         }
-        container.appendChild(dotsContainer);
 
         const updateDots = () => {
             const scrollLeft = sliderWrapper.scrollLeft;
             const slideWidth = sliderWrapper.offsetWidth;
-            const currentIndex = Math.round(scrollLeft / slideWidth);
+            const currentIndex = Math.round(scrollLeft / slideWidth) || 0;
             
-            dotsContainer.childNodes.forEach((dot, index) => {
-                dot.style.backgroundColor = (index === currentIndex) ? 'white' : 'rgba(0, 0, 0, 0.5)';
+            actualDotsContainer.childNodes.forEach((dot, index) => {
+                dot.style.backgroundColor = (index === currentIndex) ? 'white' : 'rgba(128, 128, 128, 0.5)';
             });
         };
 
@@ -7490,6 +7698,161 @@ window.openConfirmSpecificCallModal = function(partnerId, partnerName) {
     confirmModal.style.display = 'flex';
 };
 
+window.openBlockedFriendsModal = function() {
+    let modal = document.getElementById('blocked-friends-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'blocked-friends-modal';
+        modal.className = 'modal-overlay';
+        modal.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10005; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
+        modal.innerHTML = `
+            <div class="modal-box" style="background: var(--alpha-card-bg, #1E293B); padding: 20px; border-radius: 15px; width: 90%; max-width: 400px; color: var(--alpha-text, white); display: flex; flex-direction: column; gap: 15px; border: 1px solid var(--alpha-border, rgba(255,255,255,0.1)); box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-height: 80vh;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3 style="margin:0;">Blocked Friends</h3>
+                    <button id="closeBlockedModalBtn" style="background:none; border:none; color: var(--alpha-text, white); font-size:1.2rem; cursor:pointer;">✖</button>
+                </div>
+                <div id="blocked-friends-list" style="display:flex; flex-direction:column; gap:10px; overflow-y:auto; padding-right: 5px;"></div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        document.getElementById('closeBlockedModalBtn').onclick = () => {
+            modal.style.display = 'none';
+            const dash = document.getElementById('alpha-dashboard');
+            if (dash) dash.classList.remove('blur-content');
+        };
+    }
+    
+    const listContainer = document.getElementById('blocked-friends-list');
+    listContainer.innerHTML = '';
+    
+    if (blockedUsersSet.size === 0) {
+        listContainer.innerHTML = '<p style="text-align:center; opacity:0.7;">No blocked users.</p>';
+    } else {
+        blockedUsersSet.forEach(userId => {
+            const item = document.createElement('div');
+            item.style.cssText = 'display:flex; align-items:center; gap:10px; background:rgba(255,255,255,0.05); padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.05);';
+            item.innerHTML = `
+                <img id="blocked-pic-${userId}" src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" style="width:40px; height:40px; border-radius:50%; object-fit:cover;">
+                <div style="flex:1; font-weight:bold; overflow:hidden; text-overflow:ellipsis; text-align: left;" id="blocked-name-${userId}">${userId}</div>
+                <button class="unblock-btn" style="padding:8px 12px; border-radius:5px; border:none; background:#2ecc71; color:white; cursor:pointer; font-weight:bold;">Unblock</button>
+            `;
+            
+            item.querySelector('.unblock-btn').onclick = () => {
+                const updates = {};
+                updates[`blocked_users/${currentUser}/${userId}`] = null;
+                if (userId === ALPHA_ADMIN) {
+                    updates[`blocked_users/${ALPHA_ADMIN}/${currentUser}`] = null;
+                }
+                db.ref().update(updates).then(() => {
+                    showToast("User unblocked.");
+                    item.remove();
+                    if (listContainer.children.length === 0) {
+                        listContainer.innerHTML = '<p style="text-align:center; opacity:0.7;">No blocked users.</p>';
+                    }
+                });
+            };
+            
+            listContainer.appendChild(item);
+            
+            let displayName = userId;
+            if (userId === BETA_ADMIN) displayName = "Beta";
+            else if (userId === ALPHA_ADMIN) displayName = "Alpha";
+            else {
+                db.ref(`Other User Table/${userId}`).once('value').then(s => {
+                    if (s.exists() && s.val().name) {
+                        const nameEl = document.getElementById(`blocked-name-${userId}`);
+                        if (nameEl) nameEl.innerText = s.val().name;
+                    }
+                });
+            }
+            if (userId === BETA_ADMIN || userId === ALPHA_ADMIN) {
+                const nameEl = document.getElementById(`blocked-name-${userId}`);
+                if (nameEl) nameEl.innerText = displayName;
+            }
+            
+            const role = getUserRole(userId);
+            db.ref(`Profile Pic/${role}_Profile_Pic`).once('value').then(s => { 
+                if (s.exists()) {
+                    const picEl = document.getElementById(`blocked-pic-${userId}`);
+                    if (picEl) picEl.src = s.val();
+                }
+            });
+        });
+    }
+    
+    modal.style.display = 'flex';
+    const dash = document.getElementById('alpha-dashboard');
+    if (dash) dash.classList.add('blur-content');
+};
+
+window.openUpdatePasskeyModal = function() {
+    let modal = document.getElementById('update-passkey-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'update-passkey-modal';
+        modal.className = 'modal-overlay';
+        modal.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10005; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
+        modal.innerHTML = `
+            <div class="modal-box" style="background: var(--alpha-card-bg, #1E293B); padding: 25px; border-radius: 15px; width: 90%; max-width: 400px; color: var(--alpha-text, white); display: flex; flex-direction: column; gap: 15px; border: 1px solid var(--alpha-border, rgba(255,255,255,0.1)); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                <h3 style="margin:0; text-align: center;">Update Admin Passkey</h3>
+                <input type="text" id="oldAdminPasskey" placeholder="Old Passkey" style="padding: 10px; border-radius: 5px; border: 1px solid #555; background: rgba(0,0,0,0.2); color: white; width: 100%; box-sizing: border-box;">
+                <input type="text" id="newAdminPasskey" placeholder="New Passkey" style="padding: 10px; border-radius: 5px; border: 1px solid #555; background: rgba(0,0,0,0.2); color: white; width: 100%; box-sizing: border-box;">
+                <div id="updatePasskeyError" style="color: #ff4757; font-size: 0.85rem; display: none; text-align: center; font-weight: bold;"></div>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button id="cancelUpdatePasskey" class="modal-btn cancel-btn" style="flex: 1; padding: 10px; border-radius: 8px; cursor: pointer; border: none; background: rgba(128,128,128,0.2); color: var(--alpha-text, white); font-weight: bold;">Cancel</button>
+                    <button id="confirmUpdatePasskey" class="modal-btn confirm-btn" style="flex: 1; padding: 10px; border-radius: 8px; cursor: pointer; border: none; background: #0EA5E9; color: white; font-weight: bold;">Update</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        document.getElementById('cancelUpdatePasskey').onclick = () => {
+            modal.style.display = 'none';
+            const dash = document.getElementById('alpha-dashboard');
+            if (dash) dash.classList.remove('blur-content');
+        };
+
+        document.getElementById('confirmUpdatePasskey').onclick = () => {
+            const oldP = document.getElementById('oldAdminPasskey').value.trim();
+            const newP = document.getElementById('newAdminPasskey').value.trim();
+            const err = document.getElementById('updatePasskeyError');
+
+            if (oldP !== adminPasskey) {
+                err.innerText = "Incorrect Old Passkey";
+                err.style.display = 'block';
+                triggerShake(document.getElementById('oldAdminPasskey'));
+                return;
+            }
+            if (!newP) {
+                err.innerText = "New Passkey cannot be empty";
+                err.style.display = 'block';
+                triggerShake(document.getElementById('newAdminPasskey'));
+                return;
+            }
+
+            // Update local state & Database
+            adminPasskey = newP;
+            db.ref('admin_config/passkey').set(newP).then(() => {
+                showToast("Admin Passkey updated successfully!");
+                modal.style.display = 'none';
+                const dash = document.getElementById('alpha-dashboard');
+                if (dash) dash.classList.remove('blur-content');
+            }).catch(e => {
+                err.innerText = "Error saving to database";
+                err.style.display = 'block';
+            });
+        };
+    }
+    
+    document.getElementById('oldAdminPasskey').value = '';
+    document.getElementById('newAdminPasskey').value = '';
+    document.getElementById('updatePasskeyError').style.display = 'none';
+    
+    modal.style.display = 'flex';
+    const dash = document.getElementById('alpha-dashboard');
+    if (dash) dash.classList.add('blur-content');
+};
+
 // --- Alpha User Home Screen Logic ---
 let alphaFriendListContainer;
 let alphaBackBtn;
@@ -7561,7 +7924,7 @@ function initAlphaUI() {
     const updateThemeToggleLogic = () => {
         themeToggleBtn.click();
         const isLight = document.body.classList.contains('light-mode');
-        headerActionIcon.innerHTML = isLight ? '◐' : '◑';
+        headerActionIcon.innerHTML = isLight ? THEME_ICON_DARK : THEME_ICON_LIGHT;
         dashboard.style.setProperty('--alpha-bg', isLight ? '#efeae2' : '#0F172A');
         dashboard.style.setProperty('--alpha-header-bg', isLight ? '#ffffff' : '#0F172A');
         dashboard.style.setProperty('--alpha-text', isLight ? '#080707' : '#e6e9ee');
@@ -7574,7 +7937,7 @@ function initAlphaUI() {
 
     // Ensure dark/light toggle is visible and active immediately on login
     const isLightInitial = document.body.classList.contains('light-mode');
-    headerActionIcon.innerHTML = isLightInitial ? '◐' : '◑';
+    headerActionIcon.innerHTML = isLightInitial ? THEME_ICON_DARK : THEME_ICON_LIGHT;
     headerActionBtn.onclick = (e) => {
         e.stopPropagation();
         updateThemeToggleLogic();
@@ -7639,11 +8002,26 @@ function initAlphaUI() {
 
     const statusEmptyText = document.createElement('div');
     statusEmptyText.id = 'alpha-status-empty-text';
-    statusEmptyText.innerText = "No status uploaded yet.";
-    statusEmptyText.style.cssText = `flex: 1; display: flex; align-items: center; justify-content: center; color: gray; font-size: 1.1rem;`;
+    statusEmptyText.style.cssText = `flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: gray; text-align: center; gap: 5px;`;
+    statusEmptyText.innerHTML = `
+        <img id="alpha-status-empty-pic" src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid #0EA5E9; box-shadow: 0 4px 15px rgba(0,0,0,0.3); margin-bottom: 10px;">
+        <h3 style="margin: 0; color: var(--alpha-text, white); font-size: 1.3rem;">No Status Feeds</h3>
+        <p style="margin: 0; font-size: 0.95rem; opacity: 0.7;">Official updates will appear here</p>
+    `;
+
+    if (typeof db !== 'undefined' && db) {
+        db.ref('Profile Pic/Alpha_Profile_Pic').on('value', snap => {
+            const pic = document.getElementById('alpha-status-empty-pic');
+            if (pic && snap.exists()) pic.src = snap.val();
+        });
+    }
 
     const statusDisplayContainer = document.createElement('div');
-    statusDisplayContainer.style.cssText = `width: 100%; flex: 1; display: none; flex-direction: column; align-items: center; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); overflow-y: auto; padding: 15px; box-sizing: border-box;`;
+    statusDisplayContainer.style.cssText = `width: 100%; flex: 1; display: none; flex-direction: column; align-items: center; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); overflow: hidden; padding: 15px; box-sizing: border-box;`;
+
+    const statusDotsContainer = document.createElement('div');
+    statusDotsContainer.id = 'alpha-status-dots-container';
+    statusDotsContainer.style.cssText = `display: flex; justify-content: center; gap: 8px; align-items: center; min-height: 15px; display: none;`;
 
     const statusSendBtn = document.createElement('button');
     statusSendBtn.id = 'alpha-status-send-btn';
@@ -7674,7 +8052,7 @@ function initAlphaUI() {
     const statusFileInput = document.createElement('input');
     statusFileInput.type = 'file';
     statusFileInput.accept = 'image/*';
-    statusFileInput.multiple = true;
+    statusFileInput.multiple = false;
     statusFileInput.style.display = 'none';
 
     let isAddingMore = false;
@@ -7688,12 +8066,15 @@ function initAlphaUI() {
         const imageUrls = (activeStatusData && activeStatusData.images) ? activeStatusData.images : [];
         currentStatusCount = imageUrls.length;
         if (imageUrls.length > 0) {
-            createStatusSlider(statusDisplayContainer, imageUrls, true);
+            createStatusSlider(statusDisplayContainer, imageUrls, true, statusDotsContainer);
             statusDisplayContainer.style.display = 'flex';
+            statusDotsContainer.style.display = 'flex';
             statusEmptyText.style.display = 'none';
         } else {
             statusDisplayContainer.innerHTML = '';
+            statusDotsContainer.innerHTML = '';
             statusDisplayContainer.style.display = 'none';
+            statusDotsContainer.style.display = 'none';
             statusEmptyText.style.display = 'flex';
         }
     });
@@ -7925,6 +8306,7 @@ function initAlphaUI() {
 
     statusView.appendChild(statusEmptyText);
     statusView.appendChild(statusDisplayContainer);
+    statusView.appendChild(statusDotsContainer);
     statusView.appendChild(statusFileInput);
     contentArea.appendChild(statusView);
 
@@ -8040,16 +8422,16 @@ function initAlphaUI() {
         return btn;
     };
 
-    menuView.appendChild(createMenuBtn('Update Profile Pic', () => profileBtn.click()));
+    menuView.appendChild(createMenuBtn('Profile Details', () => profileBtn.click()));
+    menuView.appendChild(createMenuBtn('Update Admin Passkey', () => {
+        if (typeof openUpdatePasskeyModal === 'function') openUpdatePasskeyModal();
+    }));
     menuView.appendChild(createMenuBtn('Change Font', () => document.getElementById('changeFontBtn')?.click()));
     menuView.appendChild(createMenuBtn('Change Password', () => changePassBtn.click()));
     menuView.appendChild(createMenuBtn('Friends', () => document.getElementById('menuFriendsBtn')?.click()));
     
     const blockedBtn = createMenuBtn('Blocked Friends', () => {
-        let msg = "Blocked Users:\n";
-        if(blockedUsersSet.size === 0) msg += "None";
-        else blockedUsersSet.forEach(u => msg += u + "\n");
-        alert(msg);
+        if (typeof openBlockedFriendsModal === 'function') openBlockedFriendsModal();
     });
     menuView.appendChild(blockedBtn);
     
@@ -8101,7 +8483,7 @@ function initAlphaUI() {
             
             if (item.id === 'message' || item.id === 'menu') {
                 const isLight = document.body.classList.contains('light-mode');
-                headerActionIcon.innerHTML = isLight ? '◐' : '◑';
+                headerActionIcon.innerHTML = isLight ? THEME_ICON_DARK : THEME_ICON_LIGHT;
                 headerActionIcon.style.fontSize = '1.5rem';
                 headerActionIcon.style.display = 'flex';
                 headerActionBtn.style.display = 'flex';
@@ -8210,7 +8592,7 @@ function initAlphaUI() {
     
     // Apply initial theme settings if body is already in light mode
     if (document.body.classList.contains('light-mode')) {
-        headerActionIcon.innerHTML = '◐';
+        headerActionIcon.innerHTML = THEME_ICON_DARK;
             dashboard.style.setProperty('--alpha-bg', '#efeae2');
         dashboard.style.setProperty('--alpha-header-bg', '#ffffff');
             dashboard.style.setProperty('--alpha-text', '#000000');
@@ -8236,6 +8618,10 @@ function showAlphaHomeScreen() {
     
     currentChatPartner = null;
     updatePinnedMessageListener();
+
+    if (currentUser === ALPHA_ADMIN) {
+        stopHeartbeat();
+    }
 
     // Switch Headers
     const defaultHeader = document.querySelector('header');
@@ -8500,6 +8886,10 @@ function openAlphaChat(friendId, friendName) {
     if (chatInputBar) chatInputBar.style.display = 'flex';
     currentChatPartner = friendId;
     
+    if (currentUser === ALPHA_ADMIN) {
+        startHeartbeat();
+    }
+
     // Reset and Update initial status for header variables
     isOtherUserTyping = false;
     if (latestAlphaStatusData[friendId]) {
