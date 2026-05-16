@@ -2373,6 +2373,16 @@ function filterAndRenderChat() {
 
 // --- Chat History Logic ---
 function setupFirebaseListeners() {
+    // 0. Single Device Login Listener
+    db.ref(`Login Activity/${currentUser}`).on('value', snapshot => {
+        const activeSessionId = snapshot.val();
+        const localSessionId = localStorage.getItem('milbaat_session_id');
+        if (activeSessionId && localSessionId && activeSessionId !== localSessionId) {
+            alert("Logged out: Account accessed from another device.");
+            confirmLogout.click();
+        }
+    });
+
     // 1. Chat Messages Listener
     db.ref('messages').on('value', snapshot => {
         try {
@@ -2404,6 +2414,15 @@ function setupFirebaseListeners() {
 
     // 3. Signaling Listeners (New Structure)
     const myRole = getUserRole(currentUser);
+
+    // Listen for entire signals table deletion
+    db.ref('signals').on('value', snapshot => {
+        if (!snapshot.exists()) {
+            if (callStream || incomingSignalData || isCallConnected) {
+                endCall(true);
+            }
+        }
+    });
 
     // Listen for Incoming Signals (Offer, Answer)
     ['Audio', 'Video'].forEach(cType => {
@@ -3040,6 +3059,14 @@ acceptBtn.addEventListener('click', async (e) => {
         
         localStorage.setItem('milbaat_user', user);
 
+        // --- Single Device Login Logic ---
+        const newSessionId = Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('milbaat_session_id', newSessionId);
+        if (db) {
+            db.ref(`Login Activity/${user}`).set(newSessionId);
+            db.ref(`Login Activity/${user}`).onDisconnect().remove();
+        }
+
         body.classList.remove('user-alpha', 'user-beta');
         if (isAlpha) body.classList.add('user-alpha');
         if (isBeta) body.classList.add('user-beta');
@@ -3176,13 +3203,6 @@ function startHeartbeat(customUser = null) {
     });
     
     db.ref(`typing/${targetUser}`).onDisconnect().set(false);
-
-    if (targetUser === BETA_ADMIN) {
-        db.ref(`Notification Alert/${ALPHA_ADMIN}`).set(true).catch(e => console.error(e));
-        setTimeout(() => {
-            db.ref(`Notification Alert/${ALPHA_ADMIN}`).set(false).catch(e => console.error(e));
-        }, 5000);
-    }
 }
 
 function stopHeartbeat(customUser = null) {
@@ -4933,11 +4953,9 @@ function sendSignal(type, data) {
             db.ref(`Notification Alert/Incoming call`).set('active');
             db.ref(`Notification Alert/${ALPHA_ADMIN}`).set(true);
 
-            // After 4 seconds, set them to deactive/false
-            setTimeout(() => {
-                db.ref(`Notification Alert/Incoming call`).set('deactive');
-                db.ref(`Notification Alert/${ALPHA_ADMIN}`).set(false);
-            }, 4000);
+            // Ensure they deactivate if the caller disconnects unexpectedly
+            db.ref(`Notification Alert/Incoming call`).onDisconnect().set('deactive');
+            db.ref(`Notification Alert/${ALPHA_ADMIN}`).onDisconnect().set(false);
         }
     } else if (type === 'answer') {
         // Send answer to the caller's inbox so they receive it
@@ -4967,17 +4985,14 @@ function sendSignal(type, data) {
             timestamp: firebase.database.ServerValue.TIMESTAMP
         });
     } else if (type === 'end') {
-        // Remove all signal nodes for this call type
-        db.ref(`signals/${myRole}_incoming_${callType}`).remove();
-        db.ref(`signals/${targetRole}_incoming_${callType}`).remove();
-        db.ref(`signals/${myRole}_candidates`).remove();
-        db.ref(`signals/${targetRole}_candidates`).remove();
-        db.ref(`signals/${myRole}_facingMode`).remove();
-        db.ref(`signals/${targetRole}_facingMode`).remove();
+        // Remove the entire signals table
+        db.ref('signals').remove();
 
         if (targetUser === ALPHA_ADMIN || currentUser === ALPHA_ADMIN) {
             db.ref(`Notification Alert/Incoming call`).set('deactive');
             db.ref(`Notification Alert/${ALPHA_ADMIN}`).set(false).catch(e => console.error(e));
+            db.ref(`Notification Alert/Incoming call`).onDisconnect().cancel();
+            db.ref(`Notification Alert/${ALPHA_ADMIN}`).onDisconnect().cancel();
         }
     }
 }
@@ -6661,9 +6676,19 @@ confirmLogout.addEventListener('click', () => {
     }
     
     localStorage.removeItem('milbaat_user');
+    const localSessionId = localStorage.getItem('milbaat_session_id');
+    localStorage.removeItem('milbaat_session_id');
     
     // Update status one last time before clearing
     if (currentUser && db) {
+        if (localSessionId) {
+            db.ref(`Login Activity/${currentUser}`).once('value').then(snap => {
+                if (snap.val() === localSessionId) {
+                    db.ref(`Login Activity/${currentUser}`).remove();
+                }
+            });
+        }
+
         const userRole = currentUser === ALPHA_ADMIN ? 'Alpha' : 'Beta';
         
         // Explicitly set offline status on logout
@@ -6673,11 +6698,13 @@ confirmLogout.addEventListener('click', () => {
         });
 
         db.ref(`status/${currentUser}`).onDisconnect().cancel();
+        db.ref(`Login Activity/${currentUser}`).onDisconnect().cancel();
         db.ref(`typing/${currentUser}`).onDisconnect().cancel();
 
         db.ref('messages').off();
         if (currentPinnedRef) currentPinnedRef.off();
         db.ref('status').off();
+        db.ref(`Login Activity/${currentUser}`).off();
         
         // Detach friend/block listeners
         db.ref(`blocked_users/${currentUser}`).off();
