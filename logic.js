@@ -178,9 +178,18 @@ headerLogoutBtn.addEventListener('click', () => {
         headerLeftSide.appendChild(headerLogoutBtn);
     }
 
+    const headerProfilePic = document.createElement('img');
+    headerProfilePic.id = 'headerProfilePic';
+    headerProfilePic.src = 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
+    headerProfilePic.style.cssText = 'width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 10px; cursor: pointer; border: 2px solid rgba(255,255,255,0.2); display: none;';
+    headerProfilePic.onclick = () => {
+        if (typeof openChatPartnerProfile === 'function') openChatPartnerProfile();
+    };
+    headerLeftSide.appendChild(headerProfilePic);
+
     // Left Container (Logo & Status)
     const leftContainer = document.createElement('div');
-    leftContainer.style.cssText = 'display: flex; flex-direction: column; justify-content: center; align-items: flex-start; overflow: hidden;';
+    leftContainer.style.cssText = 'display: flex; flex-direction: column; justify-content: center; align-items: flex-start; overflow: hidden; width: 100%;';
     if (logoDisplay) {
         logoDisplay.style.margin = '0';
         logoDisplay.style.lineHeight = '1.2';
@@ -199,7 +208,7 @@ headerLogoutBtn.addEventListener('click', () => {
 
     // Right Container (Icons)
     const rightContainer = document.createElement('div');
-    rightContainer.style.cssText = 'display: flex; align-items: center; gap: 5px; margin-left: 5px;';
+    rightContainer.style.cssText = 'display: flex; align-items: center; gap: 20px; margin-left: 5px;';
     
     if (menuIconBtn) {
         menuIconBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px; display: block; margin: auto; transition: transform 0.3s ease;"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>';
@@ -226,6 +235,59 @@ headerLogoutBtn.addEventListener('click', () => {
     // Push content down so it's not hidden behind header
     if (mainContent) mainContent.style.paddingTop = '60px';
 })();
+
+window.updateHeaderProfilePic = async function() {
+    const headerPic = document.getElementById('headerProfilePic');
+    if (!headerPic) return;
+    
+    if (!currentChatPartner) {
+        headerPic.style.display = 'none';
+        if (logoDisplay) {
+            logoDisplay.innerText = 'NEXUS';
+            logoDisplay.style.fontSize = '1.2rem';
+        }
+        return;
+    }
+    
+    headerPic.style.display = 'block';
+    
+    let partnerName = currentChatPartner;
+    if (currentChatPartner === BETA_ADMIN) partnerName = "Beta";
+    else if (currentChatPartner === ALPHA_ADMIN) partnerName = "Alpha";
+    else {
+        const uSnap = await db.ref(`Other User Table/${currentChatPartner}`).once('value');
+        if (uSnap.exists() && uSnap.val().name) partnerName = uSnap.val().name;
+    }
+    if (logoDisplay) {
+        logoDisplay.innerText = partnerName;
+        logoDisplay.style.display = 'block';
+
+        logoDisplay.style.whiteSpace = 'nowrap';
+        logoDisplay.style.overflow = 'hidden';
+        logoDisplay.style.textOverflow = 'ellipsis';
+        logoDisplay.style.maxWidth = '100%';
+
+        if (partnerName.length > 18) {
+            logoDisplay.style.fontSize = '0.85rem';
+        } else if (partnerName.length > 12) {
+            logoDisplay.style.fontSize = '1rem';
+        } else {
+            logoDisplay.style.fontSize = '1.2rem';
+        }
+    }
+
+    const role = getUserRole(currentChatPartner);
+    
+    db.ref(`Profile Pic/${role}_Profile_Pic`).once('value').then(snap => {
+        if(snap.exists()) headerPic.src = snap.val();
+        else {
+            db.ref(`Other User Table/${currentChatPartner}`).once('value').then(uSnap => {
+                 if(uSnap.exists() && uSnap.val().profilePic) headerPic.src = uSnap.val().profilePic;
+                 else headerPic.src = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
+            });
+        }
+    });
+};
 
 // --- Dynamic Footer Setup ---
 (function setupFooter() {
@@ -1050,7 +1112,7 @@ headerLogoutBtn.addEventListener('click', () => {
     }
 
     function processNumpadInput(val) {
-        if (val === '*' || val === '#') {
+        if (val === 'C' || val === 'c') {
             currentPin = "";
             if(display) display.innerText = "";
             if(regBtn) {
@@ -1060,7 +1122,7 @@ headerLogoutBtn.addEventListener('click', () => {
             return;
         }
         
-        if (val === 'Backspace') {
+        if (val === 'Backspace' || val === '⌫') {
             currentPin = currentPin.slice(0, -1);
             if(display) display.innerText = '*'.repeat(currentPin.length);
             if (currentPin.length === 0 && regBtn) {
@@ -1101,7 +1163,7 @@ headerLogoutBtn.addEventListener('click', () => {
     document.addEventListener('keydown', (e) => {
         if (numModal && numModal.style.display === 'flex') {
             const key = e.key;
-            if (/^[0-9]$/.test(key) || key === '*' || key === '#') {
+            if (/^[0-9]$/.test(key) || key.toLowerCase() === 'c') {
                 e.preventDefault();
                 processNumpadInput(key);
             } else if (key === 'Backspace') {
@@ -2243,6 +2305,34 @@ async function sendNotificationAlert(recipient) {
     return;
 }
 
+window.showSessionExpiredModal = function() {
+    let modal = document.getElementById('session-expired-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'session-expired-modal';
+        modal.className = 'modal-overlay';
+        modal.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10010; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
+        modal.innerHTML = `
+            <div class="modal-box" style="background: var(--alpha-card-bg, #1E293B); padding: 25px; border-radius: 15px; width: 85%; max-width: 350px; text-align: center; color: var(--alpha-text, white); border: 1px solid var(--alpha-border, rgba(255,255,255,0.1)); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                <h3 style="margin-bottom: 15px; color: #ff4757;">Session Expired</h3>
+                <p style="margin-bottom: 20px; opacity: 0.8; font-size: 0.95rem;">Logged out: Account accessed from another device.</p>
+                <button id="confirmSessionExpired" class="modal-btn confirm-btn" style="width: 100%; padding: 10px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; background: #0EA5E9; color: white;">OK</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        document.getElementById('confirmSessionExpired').onclick = () => {
+            modal.style.display = 'none';
+            if (typeof confirmLogout !== 'undefined' && confirmLogout) confirmLogout.click();
+        };
+    }
+    
+    modal.style.display = 'flex';
+    if (typeof mainContent !== 'undefined' && mainContent) mainContent.classList.add('blur-content');
+    const alphaDash = document.getElementById('alpha-dashboard');
+    if (alphaDash) alphaDash.classList.add('blur-content');
+};
+
 window.showUnblockPrompt = function() {
     let modal = document.getElementById('unblock-prompt-modal');
     if (!modal) {
@@ -2378,8 +2468,12 @@ function setupFirebaseListeners() {
         const activeSessionId = snapshot.val();
         const localSessionId = localStorage.getItem('milbaat_session_id');
         if (activeSessionId && localSessionId && activeSessionId !== localSessionId) {
-            alert("Logged out: Account accessed from another device.");
-            confirmLogout.click();
+            if (typeof window.showSessionExpiredModal === 'function') {
+                window.showSessionExpiredModal();
+            } else {
+                alert("Logged out: Account accessed from another device.");
+                if (typeof confirmLogout !== 'undefined' && confirmLogout) confirmLogout.click();
+            }
         }
     });
 
@@ -3055,7 +3149,6 @@ acceptBtn.addEventListener('click', async (e) => {
     const performLogin = (user, displayName, isAlpha, isBeta, customData = null) => {
         currentUser = user;
         profileUsernameDisplay.innerText = displayName;
-        logoDisplay.innerText = displayName;
         
         localStorage.setItem('milbaat_user', user);
 
@@ -3095,6 +3188,7 @@ acceptBtn.addEventListener('click', async (e) => {
             chatInputBar.style.display = 'flex';
             
             if (typeof headerLogoutBtn !== 'undefined' && headerLogoutBtn) headerLogoutBtn.style.display = 'none';
+            if (typeof updateHeaderProfilePic === 'function') updateHeaderProfilePic();
         }
         
         updatePinnedMessageListener();
@@ -3243,6 +3337,27 @@ document.addEventListener("visibilitychange", () => {
     }
 });
 
+(function setupMarqueeStyle() {
+    if (!document.getElementById('marquee-style')) {
+        const mStyle = document.createElement('style');
+        mStyle.id = 'marquee-style';
+        mStyle.innerHTML = `
+            .marquee-text {
+                display: inline-block;
+                white-space: nowrap;
+                padding-left: 100%;
+                animation: marquee-pause 7s linear infinite;
+            }
+            @keyframes marquee-pause {
+                0% { transform: translateX(0); }
+                85% { transform: translateX(-100%); }
+                100% { transform: translateX(-100%); }
+            }
+        `;
+        document.head.appendChild(mStyle);
+    }
+})();
+
 function updateStatusUI(isOnline, lastSeen, isTyping) {
     if (!lastSeenDisplay) return;
     
@@ -3253,18 +3368,24 @@ function updateStatusUI(isOnline, lastSeen, isTyping) {
     lastSeenDisplay.style.fontSize = '0.75rem';
     lastSeenDisplay.style.display = 'block';
     lastSeenDisplay.style.marginTop = '2px';
+    lastSeenDisplay.style.width = '95px';
+    lastSeenDisplay.style.overflow = 'hidden';
+    lastSeenDisplay.style.whiteSpace = 'nowrap';
+
+    let textToShow = "";
+    let colorToShow = "";
+    let isMarquee = true;
 
     if (isOnline && isTyping) {
-        lastSeenDisplay.innerText = "Typing...";
-        lastSeenDisplay.style.color = '#2ecc71';
-        return;
-    }
-
-    if (isOnline) {
-        lastSeenDisplay.innerText = "Online";
-        lastSeenDisplay.style.color = '#2ecc71';
+        textToShow = "Typing...";
+        colorToShow = '#2ecc71';
+        isMarquee = false;
+    } else if (isOnline) {
+        textToShow = "Active Now";
+        colorToShow = '#2ecc71';
+        isMarquee = false;
     } else {
-        lastSeenDisplay.style.color = 'rgba(255, 255, 255, 0.6)';
+        colorToShow = 'rgba(255, 255, 255, 0.6)';
         
         if (lastSeen && typeof lastSeen === 'number') {
             const date = new Date(lastSeen);
@@ -3273,16 +3394,22 @@ function updateStatusUI(isOnline, lastSeen, isTyping) {
             const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
             
             if (isToday) {
-                lastSeenDisplay.innerText = `Last seen today at ${timeStr}`;
+                textToShow = `Last seen today at ${timeStr}`;
             } else {
                 const d = String(date.getDate()).padStart(2, '0');
                 const m = String(date.getMonth() + 1).padStart(2, '0');
                 const y = date.getFullYear();
-                lastSeenDisplay.innerText = `Last seen ${d}/${m}/${y} ${timeStr}`;
+                textToShow = `Last seen ${d}/${m}/${y} ${timeStr}`;
             }
         } else {
-            lastSeenDisplay.innerText = "Offline";
+            textToShow = "Offline";
         }
+    }
+    
+    const spanClass = isMarquee ? 'marquee-text' : '';
+    const newHtml = `<span class="${spanClass}" style="color: ${colorToShow};">${textToShow}</span>`;
+    if (lastSeenDisplay.innerHTML !== newHtml) {
+        lastSeenDisplay.innerHTML = newHtml;
     }
 }
 
@@ -4054,6 +4181,126 @@ confirmChangePass.addEventListener('click', () => {
         triggerShake(oldPassInput);
     }
 });
+
+window.openChatPartnerProfile = async function() {
+    if (!currentChatPartner) return;
+    
+    if (typeof menuOptions !== 'undefined' && menuOptions) menuOptions.style.display = 'none';
+    if (typeof menuIconBtn !== 'undefined' && menuIconBtn) menuIconBtn.classList.remove('rotate');
+    profileModal.style.display = 'flex';
+    mainContent.classList.add('blur-content');
+
+    if (closeProfileBtn.parentNode) closeProfileBtn.parentNode.style.position = 'relative';
+    closeProfileBtn.style.cssText = 'position: absolute; top: 12px; right: 15px; background: transparent; border: none; font-size: 1.2rem; cursor: pointer; padding: 0; box-shadow: none; color: white;';
+    closeProfileBtn.innerHTML = '❌';
+
+    let uniqueCodeDisplay = document.getElementById('userUniqueCodeDisplay');
+    if (!uniqueCodeDisplay) {
+        uniqueCodeDisplay = document.createElement('div');
+        uniqueCodeDisplay.id = 'userUniqueCodeDisplay';
+        uniqueCodeDisplay.style.cssText = 'margin-top: 10px; font-size: 1rem; font-weight: bold; letter-spacing: 1px;';
+        if (profileImageDisplay && profileImageDisplay.parentNode) {
+            profileImageDisplay.parentNode.insertBefore(uniqueCodeDisplay, profileImageDisplay.nextSibling);
+        }
+    }
+
+    let accountDateDisplay = document.getElementById('userAccountDateDisplay');
+    if (!accountDateDisplay) {
+        accountDateDisplay = document.createElement('div');
+        accountDateDisplay.id = 'userAccountDateDisplay';
+        accountDateDisplay.style.cssText = 'margin-top: 5px; font-size: 0.9rem; font-weight: 500;';
+        if (uniqueCodeDisplay && uniqueCodeDisplay.parentNode) {
+            uniqueCodeDisplay.parentNode.insertBefore(accountDateDisplay, uniqueCodeDisplay.nextSibling);
+        }
+    }
+
+    const isLightMode = document.body.classList.contains('light-mode');
+    uniqueCodeDisplay.style.color = isLightMode ? '#0052d4' : '#00d2ff';
+    accountDateDisplay.style.color = isLightMode ? '#555' : 'rgba(255,255,255,0.7)';
+
+    let blockUserBtn = document.getElementById('blockUserBtn');
+    if (!blockUserBtn) {
+        blockUserBtn = document.createElement('button');
+        blockUserBtn.id = 'blockUserBtn';
+        blockUserBtn.className = 'modal-btn';
+        blockUserBtn.style.cssText = 'margin-top: 15px; padding: 10px; width: 100%; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; color: white; display: none;';
+        closeProfileBtn.parentNode.insertBefore(blockUserBtn, closeProfileBtn);
+    }
+
+    if (uploadTriggerBtn) uploadTriggerBtn.style.display = 'none';
+    profileImageDisplay.style.cursor = 'default';
+    blockUserBtn.style.display = 'block';
+    
+    const roleText = profileUsernameDisplay.nextElementSibling;
+    let partnerName = currentChatPartner;
+    let partnerPic = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
+    let partnerCode = "";
+    let partnerDate = "";
+
+    profileUsernameDisplay.innerText = "Loading...";
+
+    if (currentChatPartner === BETA_ADMIN) {
+        partnerName = "Beta";
+        const pSnap = await db.ref(`Profile Pic/Beta_Profile_Pic`).once('value');
+        if (pSnap.exists()) partnerPic = pSnap.val();
+    } else if (currentChatPartner === ALPHA_ADMIN) {
+        partnerName = "Alpha";
+        const pSnap = await db.ref(`Profile Pic/Alpha_Profile_Pic`).once('value');
+        if (pSnap.exists()) partnerPic = pSnap.val();
+    } else {
+        const uSnap = await db.ref(`Other User Table/${currentChatPartner}`).once('value');
+        if (uSnap.exists()) {
+            const u = uSnap.val();
+            partnerName = u.name || currentChatPartner;
+            partnerCode = u.uniqueCode || "";
+            partnerDate = u.accountOpeningDate || "";
+            if (u.profilePic) partnerPic = u.profilePic;
+        }
+        const pSnap = await db.ref(`Profile Pic/${currentChatPartner}_Profile_Pic`).once('value');
+        if (pSnap.exists()) partnerPic = pSnap.val();
+    }
+
+    profileImageDisplay.src = partnerPic;
+    profileUsernameDisplay.innerText = partnerName;
+    uniqueCodeDisplay.innerText = partnerCode ? `Code: ${partnerCode}` : 'Administrator';
+    accountDateDisplay.innerText = partnerDate ? `Joined: ${partnerDate}` : '';
+
+    if (roleText && roleText.tagName === 'DIV') {
+        roleText.style.display = (currentChatPartner === ALPHA_ADMIN || currentChatPartner === BETA_ADMIN) ? 'block' : 'none';
+        if (roleText.style.display === 'block') roleText.innerText = "Administrator";
+    }
+
+    const updateBlockBtn = () => {
+        const isBlocked = blockedUsersSet.has(currentChatPartner);
+        blockUserBtn.innerText = isBlocked ? `Unblock ${partnerName}` : `Block ${partnerName}`;
+        blockUserBtn.style.background = isBlocked ? '#2ecc71' : '#ff4757';
+    };
+    updateBlockBtn();
+
+    blockUserBtn.onclick = () => {
+        const currentlyBlocked = blockedUsersSet.has(currentChatPartner);
+        const updates = {};
+        if (currentlyBlocked) {
+            updates[`blocked_users/${currentUser}/${currentChatPartner}`] = null;
+            if (currentChatPartner === ALPHA_ADMIN) updates[`blocked_users/${ALPHA_ADMIN}/${currentUser}`] = null;
+            else if (currentUser === ALPHA_ADMIN) updates[`blocked_users/${currentChatPartner}/${ALPHA_ADMIN}`] = null;
+            
+            db.ref().update(updates).then(() => {
+                showToast(`${partnerName} unblocked.`);
+                updateBlockBtn();
+            });
+        } else {
+            updates[`blocked_users/${currentUser}/${currentChatPartner}`] = true;
+            if (currentChatPartner === ALPHA_ADMIN) updates[`blocked_users/${ALPHA_ADMIN}/${currentUser}`] = true;
+            else if (currentUser === ALPHA_ADMIN) updates[`blocked_users/${currentChatPartner}/${ALPHA_ADMIN}`] = true;
+
+            db.ref().update(updates).then(() => {
+                showToast(`${partnerName} blocked.`);
+                updateBlockBtn();
+            });
+        }
+    };
+};
 
 // --- Profile Logic ---
 profileBtn.addEventListener('click', async () => {
@@ -6800,7 +7047,8 @@ window.addEventListener('popstate', (e) => {
         { el: document.getElementById('confirm-specific-call-modal'), closeBtn: 'cancelSpecificCallClear' },
         { el: document.getElementById('unblock-prompt-modal'), closeBtn: 'cancelUnblockPrompt' },
         { el: document.getElementById('blocked-friends-modal'), closeBtn: 'closeBlockedModalBtn' },
-        { el: document.getElementById('update-passkey-modal'), closeBtn: 'cancelUpdatePasskey' }
+        { el: document.getElementById('update-passkey-modal'), closeBtn: 'cancelUpdatePasskey' },
+        { el: document.getElementById('call-info-modal'), closeBtn: 'closeCallInfoBtn' }
     ];
 
     for (let m of overlayHandlers) {
@@ -7423,6 +7671,7 @@ function openBetaStatusModal() {
                 updatePinnedMessageListener();
                 showToast("Back to Beta Chat");
                 startHeartbeat();
+                if (typeof updateHeaderProfilePic === 'function') updateHeaderProfilePic();
             }
         });
 
@@ -8360,6 +8609,67 @@ function initAlphaUI() {
         }
     });
 
+    window.openCallInfoModal = function(record, partnerName, partnerPic) {
+        let modal = document.getElementById('call-info-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'call-info-modal';
+            modal.className = 'modal-overlay';
+            modal.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10010; align-items: center; justify-content: center; backdrop-filter: blur(5px);';
+            document.body.appendChild(modal);
+        }
+
+        let durStr = "00:00";
+        if (record.duration > 0) {
+            const m = String(Math.floor(record.duration / 60)).padStart(2, '0');
+            const s = String(record.duration % 60).padStart(2, '0');
+            durStr = `${m}m ${s}s`;
+        }
+
+        const dateObj = new Date(record.timestamp);
+        const timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const dateStr = dateObj.toLocaleDateString();
+
+        let senderName = record.type === 'Outgoing' ? "You" : partnerName;
+        let receiverName = record.type === 'Incoming' ? "You" : partnerName;
+
+        const rowStyle = "display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--alpha-border, rgba(255,255,255,0.05)); font-size: 0.9rem;";
+        const labelStyle = "opacity: 0.7; font-weight: 500;";
+        const valueStyle = "font-weight: bold; text-align: right;";
+        const statusColor = record.status === 'Completed' ? '#2ecc71' : '#ff4757';
+
+        modal.innerHTML = `
+            <div class="modal-box" style="background: var(--alpha-card-bg, #1E293B); padding: 25px; border-radius: 15px; width: 85%; max-width: 350px; color: var(--alpha-text, white); border: 1px solid var(--alpha-border, rgba(255,255,255,0.1)); box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: flex; flex-direction: column; align-items: center;">
+                <h3 style="margin: 0 0 15px 0; font-size: 1.3rem;">Call Information</h3>
+                
+                <img src="${partnerPic}" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid #0EA5E9; margin-bottom: 10px;">
+                <div style="font-size: 1.2rem; font-weight: bold; margin-bottom: 20px;">${partnerName}</div>
+                
+                <div style="width: 100%; display: flex; flex-direction: column; margin-bottom: 20px;">
+                    <div style="${rowStyle}"><span style="${labelStyle}">Sender</span> <span style="${valueStyle}">${senderName}</span></div>
+                    <div style="${rowStyle}"><span style="${labelStyle}">Receiver</span> <span style="${valueStyle}">${receiverName}</span></div>
+                    <div style="${rowStyle}"><span style="${labelStyle}">Duration</span> <span style="${valueStyle}">${durStr}</span></div>
+                    <div style="${rowStyle}"><span style="${labelStyle}">Type</span> <span style="${valueStyle}">${record.isVideo ? 'Video Call' : 'Audio Call'}</span></div>
+                    <div style="${rowStyle}"><span style="${labelStyle}">Category</span> <span style="${valueStyle}">${record.type}</span></div>
+                    <div style="${rowStyle}"><span style="${labelStyle}">Date</span> <span style="${valueStyle}">${dateStr}</span></div>
+                    <div style="${rowStyle}"><span style="${labelStyle}">Time</span> <span style="${valueStyle}">${timeStr}</span></div>
+                    <div style="${rowStyle} border-bottom: none;"><span style="${labelStyle}">Status</span> <span style="${valueStyle}; color: ${statusColor};">${record.status}</span></div>
+                </div>
+                
+                <button id="closeCallInfoBtn" class="modal-btn" style="width: 100%; padding: 12px; border-radius: 8px; border: none; background: rgba(128,128,128,0.2); color: var(--alpha-text, white); font-weight: bold; cursor: pointer; transition: background 0.2s;">Close</button>
+            </div>
+        `;
+
+        const closeBtn = document.getElementById('closeCallInfoBtn');
+        closeBtn.onmouseover = () => closeBtn.style.background = 'rgba(128,128,128,0.3)';
+        closeBtn.onmouseout = () => closeBtn.style.background = 'rgba(128,128,128,0.2)';
+        closeBtn.onclick = () => {
+            modal.style.display = 'none';
+        };
+
+        modal.style.display = 'flex';
+    };
+
     window.renderAlphaCallHistory = function() {
         if (!callHistoryView) return;
         callHistoryView.innerHTML = '';
@@ -8383,7 +8693,7 @@ function initAlphaUI() {
             let dateStr = dateObj.toLocaleDateString();
             if (new Date().toDateString() === dateObj.toDateString()) dateStr = 'Today';
 
-            const arrow = record.type === 'Incoming' ? (record.status === 'Missed' ? '↙️ (Missed)' : '↙️') : '↗️';
+            const arrow = record.type === 'Incoming' ? '↙️' : '↗️';
             const color = (record.status === 'Missed' || record.status === 'Rejected') ? '#ff4757' : '#2ecc71';
             
             const videoSvg = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><path d="M17 10.5V7c0-1.1-.9-2-2-2H5C3.9 5 3 5.9 3 7v10c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-3.5l4 4v-11l-4 4z"/></svg>';
@@ -8395,24 +8705,35 @@ function initAlphaUI() {
                 display: flex; align-items: center; padding: 12px 15px; margin-bottom: 12px;
                 background: var(--alpha-card-bg, #1E293B); border-radius: 16px;
                 border: 1px solid var(--alpha-border, rgba(255, 255, 255, 0.05));
-                box-shadow: 0 4px 6px rgba(0,0,0,0.2); position: relative;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.2); position: relative; cursor: pointer;
             `;
 
             card.innerHTML = `
                 <img id="call-pic-${record.id}" src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; margin-right: 15px;">
-                <div style="flex: 1; overflow: hidden; padding-right: 70px;">
+                <div style="flex: 1; overflow: hidden; padding-right: 80px;">
                     <div style="font-size: 1.1rem; font-weight: bold; color: var(--alpha-text, white); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="call-name-${record.id}">${record.partner}</div>
                     <div style="font-size: 0.85rem; color: ${color}; display: flex; align-items: center; gap: 5px;">
-                        <span>${arrow}</span> <span>${record.status}</span> • <span>${durStr}</span>
+                        <span>${arrow}</span> <span>${record.type}</span>
                     </div>
                 </div>
-                <div style="position: absolute; right: 15px; top: 12px; display: flex; flex-direction: column; align-items: flex-end;">
-                    <div style="color: #0EA5E9; margin-bottom: 5px; display: flex; align-items: center; justify-content: center;">${callIcon}</div>
-                    <div style="font-size: 0.7rem; color: gray; text-align: right; line-height: 1.2;">
-                        ${timeStr}<br>${dateStr}
+                <div style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: flex-end; gap: 5px;">
+                    <div style="color: #0EA5E9; display: flex; align-items: center; justify-content: center;">${callIcon}</div>
+                    <div style="font-size: 0.75rem; color: gray; text-align: right; white-space: nowrap;">
+                        ${dateStr} • ${timeStr}
                     </div>
                 </div>
             `;
+            
+            card.onclick = () => {
+                const nameEl = document.getElementById(`call-name-${record.id}`);
+                const picEl = document.getElementById(`call-pic-${record.id}`);
+                const currentName = nameEl ? nameEl.innerText : record.partner;
+                const currentPic = picEl ? picEl.src : "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
+                if (typeof window.openCallInfoModal === 'function') {
+                    window.openCallInfoModal(record, currentName, currentPic);
+                }
+            };
+            
             callHistoryView.appendChild(card);
 
             const fid = record.partner;
@@ -8645,6 +8966,7 @@ function showAlphaHomeScreen() {
     
     currentChatPartner = null;
     updatePinnedMessageListener();
+    if (typeof updateHeaderProfilePic === 'function') updateHeaderProfilePic();
 
     if (currentUser === ALPHA_ADMIN) {
         stopHeartbeat();
@@ -8938,6 +9260,7 @@ function openAlphaChat(friendId, friendName) {
 
     filterAndRenderChat();
     updatePinnedMessageListener();
+    if (typeof updateHeaderProfilePic === 'function') updateHeaderProfilePic();
 }
 
 // --- Forward Message Logic ---
