@@ -208,7 +208,7 @@ headerLogoutBtn.addEventListener('click', () => {
 
     // Right Container (Icons)
     const rightContainer = document.createElement('div');
-    rightContainer.style.cssText = 'display: flex; align-items: center; gap: 20px; margin-left: 5px;';
+    rightContainer.style.cssText = 'display: flex; align-items: center; gap: 20px; margin-left: 5px; flex-shrink: 0;';
     
     if (menuIconBtn) {
         menuIconBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px; display: block; margin: auto; transition: transform 0.3s ease;"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>';
@@ -225,6 +225,8 @@ headerLogoutBtn.addEventListener('click', () => {
             btn.style.display = 'flex';
             btn.style.alignItems = 'center';
             btn.style.justifyContent = 'center';
+            btn.style.color = 'inherit';
+            btn.style.flexShrink = '0';
             const innerIcon = btn.querySelector('img, svg');
             if (innerIcon) innerIcon.style.cssText = 'width: 24px; height: 24px; object-fit: contain; pointer-events: none; fill: currentColor;';
             rightContainer.appendChild(btn);
@@ -236,51 +238,82 @@ headerLogoutBtn.addEventListener('click', () => {
     if (mainContent) mainContent.style.paddingTop = '60px';
 })();
 
-window.updateHeaderProfilePic = async function() {
+// --- Dynamic Header Name Scaling ---
+window.updateHeaderNameUI = function(name) {
+    if (logoDisplay) {
+        logoDisplay.innerText = name;
+        logoDisplay.style.display = 'block';
+        logoDisplay.style.whiteSpace = 'nowrap';
+        logoDisplay.style.overflow = 'hidden';
+        logoDisplay.style.textOverflow = 'ellipsis';
+        logoDisplay.style.maxWidth = '100%';
+        logoDisplay.style.transition = 'font-size 0.3s ease, color 0.3s ease';
+        
+        // Strip the gradient for partner names so the text color perfectly matches the icons
+        if (name !== 'NEXUS') {
+            logoDisplay.style.background = 'none';
+            logoDisplay.style.webkitTextFillColor = 'currentColor';
+            logoDisplay.style.color = 'inherit';
+        } else {
+            logoDisplay.style.background = '';
+            logoDisplay.style.webkitTextFillColor = 'transparent';
+            logoDisplay.style.color = '';
+        }
+
+        if (name.length > 25) {
+            logoDisplay.style.fontSize = '0.55rem';
+        } else if (name.length > 20) {
+            logoDisplay.style.fontSize = '0.65rem';
+        } else if (name.length > 15) {
+            logoDisplay.style.fontSize = '0.75rem';
+        } else if (name.length > 11) {
+            logoDisplay.style.fontSize = '0.85rem';
+        } else {
+            logoDisplay.style.fontSize = '0.95rem';
+        }
+    }
+};
+
+let headerNameListenerRef = null;
+let headerPicListenerRef = null;
+
+window.updateHeaderProfilePic = function() {
     const headerPic = document.getElementById('headerProfilePic');
     if (!headerPic) return;
     
+    // Clear previous real-time listeners to prevent memory leaks
+    if (headerNameListenerRef) { headerNameListenerRef.off(); headerNameListenerRef = null; }
+    if (headerPicListenerRef) { headerPicListenerRef.off(); headerPicListenerRef = null; }
+
     if (!currentChatPartner) {
         headerPic.style.display = 'none';
-        if (logoDisplay) {
-            logoDisplay.innerText = 'NEXUS';
-            logoDisplay.style.fontSize = '1.2rem';
-        }
+        window.updateHeaderNameUI('NEXUS');
         return;
     }
     
     headerPic.style.display = 'block';
     
-    let partnerName = currentChatPartner;
-    if (currentChatPartner === BETA_ADMIN) partnerName = "Beta";
-    else if (currentChatPartner === ALPHA_ADMIN) partnerName = "Alpha";
-    else {
-        const uSnap = await db.ref(`Other User Table/${currentChatPartner}`).once('value');
+    let defaultName = currentChatPartner;
+    if (currentChatPartner === ALPHA_ADMIN) defaultName = "Alpha";
+    else if (currentChatPartner === BETA_ADMIN) defaultName = "Beta";
+
+    window.updateHeaderNameUI(defaultName);
+    
+    // Setup real-time listener for customized name
+    headerNameListenerRef = db.ref(`Other User Table/${currentChatPartner}`);
+    headerNameListenerRef.on('value', uSnap => {
+        let partnerName = defaultName;
         if (uSnap.exists() && uSnap.val().name) partnerName = uSnap.val().name;
-    }
-    if (logoDisplay) {
-        logoDisplay.innerText = partnerName;
-        logoDisplay.style.display = 'block';
-
-        logoDisplay.style.whiteSpace = 'nowrap';
-        logoDisplay.style.overflow = 'hidden';
-        logoDisplay.style.textOverflow = 'ellipsis';
-        logoDisplay.style.maxWidth = '100%';
-
-        if (partnerName.length > 18) {
-            logoDisplay.style.fontSize = '0.85rem';
-        } else if (partnerName.length > 12) {
-            logoDisplay.style.fontSize = '1rem';
-        } else {
-            logoDisplay.style.fontSize = '1.2rem';
-        }
-    }
+        window.updateHeaderNameUI(partnerName);
+    });
 
     const role = getUserRole(currentChatPartner);
     
-    db.ref(`Profile Pic/${role}_Profile_Pic`).once('value').then(snap => {
-        if(snap.exists()) headerPic.src = snap.val();
-        else {
+    headerPicListenerRef = db.ref(`Profile Pic/${role}_Profile_Pic`);
+    headerPicListenerRef.on('value', snap => {
+        if(snap.exists()) {
+            headerPic.src = snap.val();
+        } else {
             db.ref(`Other User Table/${currentChatPartner}`).once('value').then(uSnap => {
                  if(uSnap.exists() && uSnap.val().profilePic) headerPic.src = uSnap.val().profilePic;
                  else headerPic.src = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
@@ -4241,24 +4274,22 @@ window.openChatPartnerProfile = async function() {
 
     if (currentChatPartner === BETA_ADMIN) {
         partnerName = "Beta";
-        const pSnap = await db.ref(`Profile Pic/Beta_Profile_Pic`).once('value');
-        if (pSnap.exists()) partnerPic = pSnap.val();
     } else if (currentChatPartner === ALPHA_ADMIN) {
         partnerName = "Alpha";
-        const pSnap = await db.ref(`Profile Pic/Alpha_Profile_Pic`).once('value');
-        if (pSnap.exists()) partnerPic = pSnap.val();
-    } else {
-        const uSnap = await db.ref(`Other User Table/${currentChatPartner}`).once('value');
-        if (uSnap.exists()) {
-            const u = uSnap.val();
-            partnerName = u.name || currentChatPartner;
-            partnerCode = u.uniqueCode || "";
-            partnerDate = u.accountOpeningDate || "";
-            if (u.profilePic) partnerPic = u.profilePic;
-        }
-        const pSnap = await db.ref(`Profile Pic/${currentChatPartner}_Profile_Pic`).once('value');
-        if (pSnap.exists()) partnerPic = pSnap.val();
     }
+    
+    const uSnap = await db.ref(`Other User Table/${currentChatPartner}`).once('value');
+    if (uSnap.exists()) {
+        const u = uSnap.val();
+        if (u.name) partnerName = u.name;
+        if (u.uniqueCode) partnerCode = u.uniqueCode;
+        if (u.accountOpeningDate) partnerDate = u.accountOpeningDate;
+        if (u.profilePic) partnerPic = u.profilePic;
+    }
+    
+    const role = getUserRole(currentChatPartner);
+    const pSnap = await db.ref(`Profile Pic/${role}_Profile_Pic`).once('value');
+    if (pSnap.exists()) partnerPic = pSnap.val();
 
     profileImageDisplay.src = partnerPic;
     profileUsernameDisplay.innerText = partnerName;
@@ -4390,26 +4421,23 @@ profileBtn.addEventListener('click', async () => {
         if (currentChatPartner === BETA_ADMIN) {
             partnerName = "Beta";
             partnerRole = "System Admin";
-            const pSnap = await db.ref(`Profile Pic/Beta_Profile_Pic`).once('value');
-            if (pSnap.exists()) partnerPic = pSnap.val();
         } else if (currentChatPartner === ALPHA_ADMIN) {
             partnerName = "Alpha";
             partnerRole = "System Admin";
-            const pSnap = await db.ref(`Profile Pic/Alpha_Profile_Pic`).once('value');
-            if (pSnap.exists()) partnerPic = pSnap.val();
-        } else {
-            const uSnap = await db.ref(`Other User Table/${currentChatPartner}`).once('value');
-            if (uSnap.exists()) {
-                const u = uSnap.val();
-                partnerName = u.name || currentChatPartner;
-                partnerCode = u.uniqueCode || "";
-                partnerDate = u.accountOpeningDate || "";
-                if (u.profilePic) partnerPic = u.profilePic;
-            }
-            // Check latest pic
-            const pSnap = await db.ref(`Profile Pic/${currentChatPartner}_Profile_Pic`).once('value');
-            if (pSnap.exists()) partnerPic = pSnap.val();
         }
+        
+        const uSnap = await db.ref(`Other User Table/${currentChatPartner}`).once('value');
+        if (uSnap.exists()) {
+            const u = uSnap.val();
+            if (u.name) partnerName = u.name;
+            if (u.uniqueCode) partnerCode = u.uniqueCode;
+            if (u.accountOpeningDate) partnerDate = u.accountOpeningDate;
+            if (u.profilePic) partnerPic = u.profilePic;
+        }
+
+        const role = getUserRole(currentChatPartner);
+        const pSnap = await db.ref(`Profile Pic/${role}_Profile_Pic`).once('value');
+        if (pSnap.exists()) partnerPic = pSnap.val();
 
         profileImageDisplay.src = partnerPic;
         profileUsernameDisplay.innerText = partnerName;
@@ -6950,10 +6978,20 @@ confirmLogout.addEventListener('click', () => {
 
         db.ref('messages').off();
         if (currentPinnedRef) currentPinnedRef.off();
+        if (typeof headerNameListenerRef !== 'undefined' && headerNameListenerRef) headerNameListenerRef.off();
+        if (typeof headerPicListenerRef !== 'undefined' && headerPicListenerRef) headerPicListenerRef.off();
         db.ref('status').off();
         db.ref(`Login Activity/${currentUser}`).off();
         
         // Detach friend/block listeners
+        if (typeof window.friendProfileListeners !== 'undefined') {
+            Object.keys(window.friendProfileListeners).forEach(fid => {
+                db.ref(`Other User Table/${fid}`).off();
+                const role = getUserRole(fid);
+                db.ref(`Profile Pic/${role}_Profile_Pic`).off();
+            });
+            window.friendProfileListeners = {};
+        }
         db.ref(`blocked_users/${currentUser}`).off();
         if (currentUser !== ALPHA_ADMIN) {
             db.ref(`friend_requests/${currentUser}`).off();
@@ -8033,18 +8071,15 @@ window.openBlockedFriendsModal = function() {
             let displayName = userId;
             if (userId === BETA_ADMIN) displayName = "Beta";
             else if (userId === ALPHA_ADMIN) displayName = "Alpha";
-            else {
-                db.ref(`Other User Table/${userId}`).once('value').then(s => {
-                    if (s.exists() && s.val().name) {
-                        const nameEl = document.getElementById(`blocked-name-${userId}`);
-                        if (nameEl) nameEl.innerText = s.val().name;
-                    }
-                });
-            }
-            if (userId === BETA_ADMIN || userId === ALPHA_ADMIN) {
-                const nameEl = document.getElementById(`blocked-name-${userId}`);
-                if (nameEl) nameEl.innerText = displayName;
-            }
+            
+            const nameEl = document.getElementById(`blocked-name-${userId}`);
+            if (nameEl) nameEl.innerText = displayName;
+
+            db.ref(`Other User Table/${userId}`).once('value').then(s => {
+                if (s.exists() && s.val().name && nameEl) {
+                    nameEl.innerText = s.val().name;
+                }
+            });
             
             const role = getUserRole(userId);
             db.ref(`Profile Pic/${role}_Profile_Pic`).once('value').then(s => { 
@@ -8740,16 +8775,25 @@ function initAlphaUI() {
             const nameEl = document.getElementById(`call-name-${record.id}`);
             const picEl = document.getElementById(`call-pic-${record.id}`);
             
-            if (fid === BETA_ADMIN) {
-                if (nameEl) nameEl.innerText = "Beta";
-                db.ref('Profile Pic/Beta_Profile_Pic').once('value').then(s => { if(s.exists() && picEl) picEl.src = s.val(); });
-            } else if (fid === ALPHA_ADMIN) {
-                if (nameEl) nameEl.innerText = "Alpha";
-                db.ref('Profile Pic/Alpha_Profile_Pic').once('value').then(s => { if(s.exists() && picEl) picEl.src = s.val(); });
-            } else {
-                db.ref(`Other User Table/${fid}`).once('value').then(s => { if(s.exists() && nameEl) { const u = s.val(); nameEl.innerText = u.name || fid; if (u.profilePic && picEl) picEl.src = u.profilePic; } });
-                db.ref(`Profile Pic/${fid}_Profile_Pic`).once('value').then(s => { if(s.exists() && picEl) picEl.src = s.val(); });
-            }
+            let defaultName = fid;
+            if (fid === BETA_ADMIN) defaultName = "Beta";
+            else if (fid === ALPHA_ADMIN) defaultName = "Alpha";
+            
+            if (nameEl) nameEl.innerText = defaultName;
+            
+            db.ref(`Other User Table/${fid}`).once('value').then(s => { 
+                if(s.exists() && nameEl && s.val().name) { 
+                    nameEl.innerText = s.val().name; 
+                }
+                if (s.exists() && picEl && s.val().profilePic && fid !== ALPHA_ADMIN && fid !== BETA_ADMIN) {
+                    picEl.src = s.val().profilePic;
+                }
+            });
+
+            const role = getUserRole(fid);
+            db.ref(`Profile Pic/${role}_Profile_Pic`).once('value').then(s => { 
+                if(s.exists() && picEl) picEl.src = s.val(); 
+            });
         });
     };
 
@@ -9063,19 +9107,18 @@ function renderAlphaFriendList() {
             if (fid === BETA_ADMIN) {
                 name = "Beta";
                 statusMsg = "System Admin";
-                const pSnap = await db.ref(`Profile Pic/Beta_Profile_Pic`).once('value');
-                if (pSnap.exists()) pic = pSnap.val();
-            } else {
-                const uSnap = await db.ref(`Other User Table/${fid}`).once('value');
-                if (uSnap.exists()) {
-                    const u = uSnap.val();
-                    name = u.name || fid;
-                    if (u.profilePic) pic = u.profilePic;
-                }
-                // Check for updated profile pic
-                const pSnap = await db.ref(`Profile Pic/${fid}_Profile_Pic`).once('value');
-                if (pSnap.exists()) pic = pSnap.val();
             }
+
+            const uSnap = await db.ref(`Other User Table/${fid}`).once('value');
+            if (uSnap.exists()) {
+                const u = uSnap.val();
+                if (u.name) name = u.name;
+                if (u.profilePic) pic = u.profilePic;
+            }
+            
+            const role = getUserRole(fid);
+            const pSnap = await db.ref(`Profile Pic/${role}_Profile_Pic`).once('value');
+            if (pSnap.exists()) pic = pSnap.val();
 
             return {
                 id: fid,
@@ -9187,6 +9230,52 @@ function renderAlphaFriendList() {
             }
         });
 
+        // Ensure realtime UI updates for name and profile pic
+        if (typeof window.friendProfileListeners === 'undefined') {
+            window.friendProfileListeners = {};
+        }
+
+        friendsData.forEach(f => {
+            if (!window.friendProfileListeners[f.id]) {
+                window.friendProfileListeners[f.id] = true;
+                
+                db.ref(`Other User Table/${f.id}`).on('value', snap => {
+                    let newName = f.id;
+                    if (f.id === BETA_ADMIN) newName = "Beta";
+                    else if (f.id === ALPHA_ADMIN) newName = "Alpha";
+                    
+                    if (snap.exists() && snap.val().name) {
+                        newName = snap.val().name;
+                    }
+                    
+                    const card = document.getElementById(`friend-card-${f.id}`);
+                    if (card) {
+                        const nameSpan = card.querySelector('.friend-name');
+                        if (nameSpan && nameSpan.innerText !== newName) {
+                            nameSpan.innerText = newName;
+                        }
+                    }
+                });
+                
+                const role = getUserRole(f.id);
+                db.ref(`Profile Pic/${role}_Profile_Pic`).on('value', pSnap => {
+                    const card = document.getElementById(`friend-card-${f.id}`);
+                    if (card) {
+                        if (pSnap.exists()) {
+                            const img = card.querySelector('img');
+                            if (img && img.src !== pSnap.val()) img.src = pSnap.val();
+                        } else {
+                            db.ref(`Other User Table/${f.id}`).once('value').then(uSnap => {
+                                const fallbackPic = (uSnap.exists() && uSnap.val().profilePic) ? uSnap.val().profilePic : "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
+                                const img = card.querySelector('img');
+                                if (img && img.src !== fallbackPic) img.src = fallbackPic;
+                            });
+                        }
+                    }
+                });
+            }
+        });
+
         // Ensure status listener is active
         if (!alphaStatusListener) {
             alphaStatusListener = db.ref('status').on('value', snapshot => {
@@ -9252,8 +9341,7 @@ function openAlphaChat(friendId, friendName) {
     if (menuIconBtn) menuIconBtn.style.display = 'block';
 
     if (logoDisplay) {
-        logoDisplay.style.display = 'block';
-        logoDisplay.innerHTML = friendName;
+        window.updateHeaderNameUI(friendName);
     }
     
     if (headerLogoutBtn) headerLogoutBtn.style.display = 'flex';
@@ -9295,24 +9383,20 @@ async function openForwardModal() {
         let name = fid;
         let pic = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
 
-        if (fid === BETA_ADMIN) {
-            name = "Beta";
-            const pSnap = await db.ref(`Profile Pic/Beta_Profile_Pic`).once('value');
-            if (pSnap.exists()) pic = pSnap.val();
-        } else if (fid === ALPHA_ADMIN) {
-            name = "Alpha";
-            const pSnap = await db.ref(`Profile Pic/Alpha_Profile_Pic`).once('value');
-            if (pSnap.exists()) pic = pSnap.val();
-        } else {
-            const uSnap = await db.ref(`Other User Table/${fid}`).once('value');
-            if (uSnap.exists()) {
-                const u = uSnap.val();
-                name = u.name || fid;
-                if (u.profilePic) pic = u.profilePic;
-            }
-            const pSnap = await db.ref(`Profile Pic/${fid}_Profile_Pic`).once('value');
-            if (pSnap.exists()) pic = pSnap.val();
+        if (fid === BETA_ADMIN) name = "Beta";
+        else if (fid === ALPHA_ADMIN) name = "Alpha";
+        
+        const uSnap = await db.ref(`Other User Table/${fid}`).once('value');
+        if (uSnap.exists()) {
+            const u = uSnap.val();
+            if (u.name) name = u.name;
+            if (u.profilePic) pic = u.profilePic;
         }
+        
+        const role = getUserRole(fid);
+        const pSnap = await db.ref(`Profile Pic/${role}_Profile_Pic`).once('value');
+        if (pSnap.exists()) pic = pSnap.val();
+        
         return { id: fid, name, pic };
     });
 
