@@ -3773,27 +3773,32 @@ clearChatBtn.addEventListener('click', () => {
 
 confirmClearChat.addEventListener('click', () => {
     if (db && currentChatHistory.length > 0) {
-        const updates = {};
-        currentChatHistory.forEach(msg => {
-            if (msg.id) {
-                const table = msg._tableName || getMessageTable(msg.sender);
-                        const path = `messages/${table}/${msg.id}`;
-                        
-                        if (currentUser === ALPHA_ADMIN) {
-                            // Alpha clears permanently
-                            updates[path] = null;
-                        } else {
-                            // Others only hide for themselves
-                            updates[`${path}/deletedBy_${currentUser}`] = true;
-                        }
+        if (currentUser === ALPHA_ADMIN) {
+            // Alpha user performs a deep delete, including file chunks.
+            const promises = currentChatHistory.map(msg => deleteMessageAndAssociatedData(msg));
+            Promise.all(promises).then(() => {
+                // Also clear pinned message for this chat
+                if (currentUser && currentChatPartner) {
+                    const chatId = getChatId(currentUser, currentChatPartner);
+                    db.ref(`pinned_messages/${chatId}`).remove();
+                }
+            }).catch(e => console.error("Deep clear chat failed:", e));
+        } else {
+            // Other users only mark messages as deleted for themselves.
+            const updates = {};
+            currentChatHistory.forEach(msg => {
+                if (msg.id) {
+                    const table = msg._tableName || getMessageTable(msg.sender);
+                    updates[`messages/${table}/${msg.id}/deletedBy_${currentUser}`] = true;
+                }
+            });
+            // Also clear pinned message for this chat
+            if (currentUser && currentChatPartner) {
+                const chatId = getChatId(currentUser, currentChatPartner);
+                updates[`pinned_messages/${chatId}`] = null;
             }
-        });
-        // Also clear pinned message for this chat
-        if (currentUser && currentChatPartner) {
-            const chatId = getChatId(currentUser, currentChatPartner);
-            updates[`pinned_messages/${chatId}`] = null;
+            db.ref().update(updates).catch(e => console.error(e));
         }
-        db.ref().update(updates).catch(e => console.error(e));
     }
     clearChatModal.style.display = 'none';
     mainContent.classList.remove('blur-content');
@@ -4167,6 +4172,31 @@ function renderPinnedMessage(pinnedMsg) {
     }
 }
 
+async function deleteMessageAndAssociatedData(msg) {
+    if (!msg || !msg.id) return;
+
+    const table = msg._tableName || getMessageTable(msg.sender);
+    const path = `messages/${table}/${msg.id}`;
+
+    // Check for chunked files (image or generic file) and delete them
+    const fileInfo = msg.file || msg.image;
+    if (fileInfo && fileInfo.isChunked && Array.isArray(fileInfo.chunkIds)) {
+        const updates = {};
+        fileInfo.chunkIds.forEach(chunkId => {
+            updates[`file_chunks/${chunkId}`] = null;
+        });
+        try {
+            await db.ref().update(updates);
+            console.log(`Deleted ${fileInfo.chunkIds.length} chunks for message ${msg.id}`);
+        } catch (error) {
+            console.error(`Failed to delete chunks for message ${msg.id}:`, error);
+        }
+    }
+
+    // Finally, delete the message metadata itself
+    return db.ref(path).remove();
+}
+
 // --- Delete Message Logic ---
 confirmDeleteMsg.addEventListener('click', () => {
     const idsToDelete = isSelectionMode ? Array.from(selectedMsgIds) : (msgToDeleteId ? [msgToDeleteId] : []);
@@ -4179,7 +4209,7 @@ confirmDeleteMsg.addEventListener('click', () => {
 
             if (currentUser === ALPHA_ADMIN) {
                 // Alpha user deletes permanently from database
-                db.ref(path).remove();
+                deleteMessageAndAssociatedData(msg);
             } else {
                 // Other users only mark it as deleted for themselves
                 db.ref(path).update({ [`deletedBy_${currentUser}`]: true });
@@ -8316,7 +8346,12 @@ window.openConfirmSpecificCallModal = function(partnerId, partnerName) {
         confirmBtn.disabled = true;
 
         if (partnerId === 'ALL') {
-            db.ref(`call_history/${currentUser}`).remove().then(() => {
+            // For Raushan_143 (ALPHA_ADMIN), delete the entire call_history table.
+            const refToDelete = (currentUser === ALPHA_ADMIN)
+                ? db.ref('call_history')
+                : db.ref(`call_history/${currentUser}`);
+
+            refToDelete.remove().then(() => {
                 showToast(`All call history cleared`);
                 confirmModal.style.display = 'none';
                 document.getElementById('clear-specific-call-modal').style.display = 'none';
