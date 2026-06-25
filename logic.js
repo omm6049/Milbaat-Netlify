@@ -1328,6 +1328,7 @@ let isFlashOn = false;
 let currentImageBase64 = null;
 let currentVideoBase64 = null;
 let currentFileData = null;
+let currentFileChunks = null; // For large files
 let cropper = null;
 let baseImageForFilter = null;
 let currentFilterMode = 0; // 0:None, 1:Gray, 2:Sepia, 3:Invert
@@ -2812,7 +2813,17 @@ function renderChat(history, oldHistoryLength = 0) {
         // Render Image if exists
         if (msg.image) {
             const img = document.createElement('img');
-            img.src = msg.image;
+            // Check if the image is a chunked object or a simple Base64 string
+            if (typeof msg.image === 'object' && msg.image.isChunked) {
+                img.style.cursor = 'pointer';
+                // Show a placeholder and download the chunks in the background
+                img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; // 1x1 transparent gif
+                downloadAndCombineChunks(msg.image, (blob) => {
+                    img.src = URL.createObjectURL(blob);
+                });
+            } else {
+                img.src = msg.image.startsWith('data:') ? msg.image : `data:image/jpeg;base64,${msg.image}`;
+            }
             img.className = 'msg-image';
             img.dataset.msgId = msg.id; // Added for viewer sync
             msgDiv.appendChild(img);
@@ -2928,16 +2939,69 @@ function renderChat(history, oldHistoryLength = 0) {
         // Render File if exists
         if (msg.file) {
             const fileDiv = document.createElement('div');
-            fileDiv.style.cssText = 'background: rgba(0,0,0,0.1); padding: 10px; border-radius: 8px; margin: 5px 0; max-width: 200px;';
+            fileDiv.style.cssText = 'background: rgba(0,0,0,0.1); padding: 10px; border-radius: 8px; margin: 5px 0; max-width: 250px;';
+            
+            // Add a specific class for the progress indicator
+            if (msg.isUploading) {
+                fileDiv.classList.add('file-upload-progress');
+                fileDiv.dataset.uploadId = msg.id;
+            } else if (msg.file && msg.file.isChunked) {
+                fileDiv.classList.add('file-download-progress');
+                fileDiv.dataset.downloadId = msg.id;
+                fileDiv.dataset.uploadId = msg.id;
+            } else {
+                fileDiv.style.cursor = 'pointer';
+            }
+
+            const fileIconSVG = `
+                <div class="icon-btn" style="width: 40px; height: 40px; flex-shrink: 0;">
+                    <svg viewBox="0 0 24 24" style="--paper: #f0f0f0; --icon-color: #888;">
+                        <path d="M7 2.8h7l4.2 4.2V20a1.6 1.6 0 0 1-1.6 1.6H7.8A1.6 1.6 0 0 1 6.2 20V4.4A1.6 1.6 0 0 1 7.8 2.8z"
+                        fill="var(--paper)" stroke="var(--icon-color)" stroke-width="1.5"/>
+                        <path d="M14 2.8V8h4.2" fill="none"
+                        stroke="var(--icon-color)" stroke-width="1.5"/>
+                        <line x1="9" y1="12" x2="15" y2="12"
+                        stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
+                        <line x1="9" y1="15" x2="15" y2="15"
+                        stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
+                        <line x1="9" y1="18" x2="13.5" y2="18"
+                        stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
+                    </svg>
+                </div>`;
+
+            let statusText = 'Tap to Download';
+            if (msg.isUploading) {
+                statusText = `Uploading ${msg.progress}%...`;
+            } else if (msg.sender !== currentUser) {
+                statusText = 'Click to Download';
+            }
+
             fileDiv.innerHTML = `
-                <a href="${msg.file.data}" download="${msg.file.name}" style="text-decoration:none; color:inherit; display:flex; align-items:center; gap:10px;">
-                    <span style="font-size:24px">📄</span>
+                <div style="text-decoration:none; color:inherit; display:flex; align-items:center; gap:10px;">
+                    ${fileIconSVG}
                     <div style="overflow:hidden;">
                         <div style="font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${msg.file.name}</div>
-                        <div style="font-size:10px; opacity:0.7;">Tap to Download</div>
+                        <div class="file-status-text" style="font-size:10px; opacity:0.7;">${statusText}</div>
                     </div>
-                </a>
+                </div>
             `;
+
+            // Only add click handler if it's not a temporary upload message
+            if (!msg.isUploading) {
+                fileDiv.onclick = () => {
+                    if (msg.file && msg.file.isChunked) {
+                        downloadAndCombineChunks(msg.file);
+                    } else {
+                        // For single files, we must reconstruct the data URL
+                        const dataUrl = `data:${msg.file.type};base64,${msg.file.data}`;
+                        const link = document.createElement('a');
+                        link.href = dataUrl;
+                        link.download = msg.file.name;
+                        link.click();
+                    }
+                }
+            };
+
             msgDiv.appendChild(fileDiv);
         }
 
@@ -6152,34 +6216,80 @@ function handleFileSelect(event) {
     const file = event.target.files[0];
     if (file) {
         lastImageSource = 'file';
+        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
         const reader = new FileReader();
         
         // Check if it is an image
         if (file.type.startsWith('image/')) {
-            reader.onload = function(e) {
-                currentImageBase64 = e.target.result;
-                baseImageForFilter = currentImageBase64;
-                currentFileData = null;
-                currentVideoBase64 = null;
-                currentFilterMode = 0;
-                
-                previewImage.src = currentImageBase64;
-                previewImage.style.display = 'block';
-                
-                // Show image controls
-                cropBtn.style.display = 'flex';
-                filterBtn.style.display = 'flex';
-                retakeBtn.style.display = 'flex';
-                
-                // Hide file info if exists
-                const info = document.getElementById('file-preview-info');
-                if(info) info.style.display = 'none';
-                
-                const vidPreview = document.getElementById('previewVideo');
-                if(vidPreview) vidPreview.style.display = 'none';
-
-                imagePreviewOverlay.style.display = 'flex';
+            const showImagePreview = (imgSrc) => {
+                 previewImage.src = imgSrc;
+                 previewImage.style.display = 'block';
+                 cropBtn.style.display = 'flex';
+                 filterBtn.style.display = 'flex';
+                 retakeBtn.style.display = 'flex';
+                 const info = document.getElementById('file-preview-info');
+                 if(info) info.style.display = 'none';
+                 const vidPreview = document.getElementById('previewVideo');
+                 if(vidPreview) vidPreview.style.display = 'none';
+                 imagePreviewOverlay.style.display = 'flex';
             };
+
+            if (file.size <= CHUNK_SIZE) {
+                // Handle small images normally
+                reader.onload = function(e) {
+                    currentImageBase64 = e.target.result;
+                    baseImageForFilter = currentImageBase64;
+                    currentFileData = null;
+                    currentVideoBase64 = null;
+                    currentFileChunks = null;
+                    currentFilterMode = 0;
+                    showImagePreview(currentImageBase64);
+                };
+                reader.readAsDataURL(file);
+            } else {
+                // Handle large images as generic files
+                const fileIconSVG = `
+                <div class="icon-btn" style="width: 80px; height: 80px; margin-bottom: 10px;">
+                    <svg viewBox="0 0 24 24" style="--paper: #f0f0f0; --icon-color: #ccc;">
+                        <path d="M7 2.8h7l4.2 4.2V20a1.6 1.6 0 0 1-1.6 1.6H7.8A1.6 1.6 0 0 1 6.2 20V4.4A1.6 1.6 0 0 1 7.8 2.8z"
+                        fill="var(--paper)" stroke="var(--icon-color)" stroke-width="1.5"/>
+                        <path d="M14 2.8V8h4.2" fill="none"
+                        stroke="var(--icon-color)" stroke-width="1.5"/>
+                        <line x1="9" y1="12" x2="15" y2="12"
+                        stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
+                        <line x1="9" y1="15" x2="15" y2="15"
+                        stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
+                        <line x1="9" y1="18" x2="13.5" y2="18"
+                        stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
+                    </svg>
+                </div>`;
+
+                const showFilePreview = () => {
+                    currentImageBase64 = null;
+                    currentVideoBase64 = null;
+                    previewImage.style.display = 'none';
+                    cropBtn.style.display = 'none';
+                    filterBtn.style.display = 'none';
+                    retakeBtn.style.display = 'flex';
+                    let info = document.getElementById('file-preview-info');
+                    if(!info) {
+                        info = document.createElement('div');
+                        info.id = 'file-preview-info';
+                        info.style.color = 'white';
+                        info.style.textAlign = 'center';
+                        const container = previewImage.parentNode;
+                        if (container) {
+                            container.insertBefore(info, previewImage);
+                        }
+                    }
+                    info.style.display = 'block';
+                    info.innerHTML = `${fileIconSVG}<h3 style="word-break: break-all; max-width: 80vw; margin-top: 10px;">${file.name}</h3><p>${(file.size/1024/1024).toFixed(2)} MB</p>`;
+                    imagePreviewOverlay.style.display = 'flex';
+                };
+                currentFileData = { name: file.name, type: file.type, isChunked: true };
+                currentFileChunks = [];
+                sliceAndEncode(file, CHUNK_SIZE, showFilePreview);
+            }
         } else if (file.type.startsWith('video/')) {
             // Check file size
             if (file.size > 20 * 1024 * 1024) {
@@ -6191,6 +6301,7 @@ function handleFileSelect(event) {
                 currentVideoBase64 = e.target.result;
                 currentImageBase64 = null;
                 currentFileData = null;
+                currentFileChunks = null;
                 
                 // Hide Image UI
                 previewImage.style.display = 'none';
@@ -6217,57 +6328,178 @@ function handleFileSelect(event) {
                 
                 imagePreviewOverlay.style.display = 'flex';
             };
-        } else {
-            // Handle generic files (PDF, DOC, APK, etc.)
-            if (file.size > 20 * 1024 * 1024) {
-                alert("File is too large. Maximum size is 20MB.");
-                event.target.value = '';
-                return;
-            }
-            reader.onload = function(e) {
-                currentFileData = {
-                    name: file.name,
-                    type: file.type,
-                    data: e.target.result
-                };
+        } else { // Handle PDF and other generic files
+            const fileIconSVG = `
+                <div class="icon-btn" style="width: 80px; height: 80px; margin-bottom: 10px;">
+                    <svg viewBox="0 0 24 24" style="--paper: #f0f0f0; --icon-color: #ccc;">
+                        <path d="M7 2.8h7l4.2 4.2V20a1.6 1.6 0 0 1-1.6 1.6H7.8A1.6 1.6 0 0 1 6.2 20V4.4A1.6 1.6 0 0 1 7.8 2.8z"
+                        fill="var(--paper)" stroke="var(--icon-color)" stroke-width="1.5"/>
+                        <path d="M14 2.8V8h4.2" fill="none"
+                        stroke="var(--icon-color)" stroke-width="1.5"/>
+                        <line x1="9" y1="12" x2="15" y2="12"
+                        stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
+                        <line x1="9" y1="15" x2="15" y2="15"
+                        stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
+                        <line x1="9" y1="18" x2="13.5" y2="18"
+                        stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
+                    </svg>
+                </div>`;
+
+            const showFilePreview = () => {
                 currentImageBase64 = null;
                 currentVideoBase64 = null;
-                
-                // Hide image controls
                 previewImage.style.display = 'none';
                 cropBtn.style.display = 'none';
                 filterBtn.style.display = 'none';
                 retakeBtn.style.display = 'flex';
-                
                 let info = document.getElementById('file-preview-info');
                 if(!info) {
                     info = document.createElement('div');
                     info.id = 'file-preview-info';
                     info.style.color = 'white';
-                    info.style.textAlign = 'center';
-                    info.style.marginTop = '50px';
-                    // Insert before buttons
-                    const container = document.querySelector('.preview-actions') || imagePreviewOverlay;
-                    if(container === imagePreviewOverlay) container.insertBefore(info, previewImage);
+                    info.style.textAlign = 'center'; 
+                    const container = previewImage.parentNode; // Get the direct parent of the preview image
+                    if (container) {
+                        container.insertBefore(info, previewImage);
+                    }
                 }
                 info.style.display = 'block';
-                
-                const vidPreview = document.getElementById('previewVideo');
-                if(vidPreview) vidPreview.style.display = 'none';
-                
-                info.innerHTML = `
-                    <div style="font-size: 50px; margin-bottom: 10px;">📄</div>
-                    <h3 style="word-break: break-all; max-width: 80vw;">${file.name}</h3>
-                    <p>${(file.size/1024).toFixed(1)} KB</p>
-                `;
-                
+                info.innerHTML = `${fileIconSVG}<h3 style="word-break: break-all; max-width: 80vw; margin-top: 10px;">${file.name}</h3><p>${(file.size/1024/1024).toFixed(2)} MB</p>`;
                 imagePreviewOverlay.style.display = 'flex';
             };
+
+            if (file.size <= CHUNK_SIZE) { // Handle small generic files
+                reader.onload = function(e) {
+                    currentFileData = { 
+                        name: file.name, 
+                        type: file.type, 
+                        data: e.target.result.substring(e.target.result.indexOf(',') + 1) 
+                    };
+                    currentFileChunks = null;
+                    showFilePreview();
+                };
+                reader.readAsDataURL(file);
+            } else {
+                // Handle large generic files (like PDFs)
+                showToast("Slicing large file...");
+                currentFileData = { name: file.name, type: file.type, isChunked: true };
+                currentFileChunks = [];
+                sliceAndEncode(file, CHUNK_SIZE, showFilePreview);
+            }
         }
-        reader.readAsDataURL(file);
+        // Call readAsDataURL only for file types that need it and haven't been handled already.
     }
     // Reset input so same file can be selected again
     event.target.value = '';
+}
+
+async function sliceAndEncode(file, chunkSize, onComplete) {
+    let offset = 0;
+    const totalChunks = Math.ceil(file.size / chunkSize);
+    let processedChunks = 0;
+
+    while (offset < file.size) {
+        const slice = file.slice(offset, offset + chunkSize);
+        const reader = new FileReader();
+
+        const promise = new Promise((resolve, reject) => {
+            reader.onload = (e) => {
+                // The result is a data URL (e.g., "data:application/pdf;base64,JVBERi..."). We only want the Base64 part.
+                const base64Data = e.target.result.split(',')[1];
+                if (!base64Data) {
+                    return reject(new Error("Failed to extract Base64 data from chunk."));
+                }
+                currentFileChunks.push(base64Data);
+                processedChunks++;
+                showToast(`Processing chunk ${processedChunks} of ${totalChunks}...`);
+                resolve();
+            };
+            reader.onerror = reject;
+        });
+
+        reader.readAsDataURL(slice);
+        await promise;
+        offset += chunkSize;
+    }
+    showToast("File ready to send!");
+    onComplete();
+}
+
+/**
+ * A robust Base64 to ArrayBuffer decoder that handles potential data corruption.
+ * It strips data URL prefixes, whitespace, and other non-Base64 characters.
+ * @param {string} base64 The potentially unclean Base64 string.
+ * @returns {Uint8Array} The decoded byte array.
+ */
+function robustB64Decode(base64) {
+    // 1. Strip any data URL prefix and all characters not in the Base64 alphabet.
+    const cleanB64 = base64.replace(/data:[^,]+,/, '').replace(/[^A-Za-z0-9+/=]/g, '');
+    
+    // 2. Decode the cleaned string.
+    const byteCharacters = atob(cleanB64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    return new Uint8Array(byteNumbers);
+}
+
+async function downloadAndCombineChunks(fileInfo, onBlobReady) {
+    if (!fileInfo || !fileInfo.chunkIds || fileInfo.chunkIds.length === 0) {
+        alert("Download failed: File information is missing or corrupt.");
+        return;
+    }
+
+    showToast(`Downloading ${fileInfo.chunkIds.length} file parts...`);
+
+    const progressBubble = document.querySelector(`.file-download-progress`);
+    const statusEl = progressBubble ? progressBubble.querySelector('.file-status-text') : null;
+
+    try {
+        const binaryChunks = [];
+        for (let i = 0; i < fileInfo.chunkIds.length; i++) {
+            const chunkId = fileInfo.chunkIds[i];
+            const snap = await db.ref(`file_chunks/${chunkId}`).once('value');
+            const base64Chunk = snap.val();
+
+            if (!base64Chunk || typeof base64Chunk !== 'string') {
+                throw new Error(`File part ${i + 1} is missing or corrupt.`);
+            }
+
+            // **Definitive Fix**: Decode each chunk to binary individually.
+            // This avoids all issues with Base64 padding characters in the middle of the combined string.
+            const byteCharacters = atob(base64Chunk);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let j = 0; j < byteCharacters.length; j++) {
+                byteNumbers[j] = byteCharacters.charCodeAt(j);
+            }
+            binaryChunks.push(new Uint8Array(byteNumbers));
+
+            const progress = Math.round(((i + 1) / fileInfo.chunkIds.length) * 100);
+            if (statusEl) statusEl.innerText = `Downloading ${progress}%...`;
+        }
+
+        // Create a single Blob from the array of binary (Uint8Array) chunks.
+        const blob = new Blob(binaryChunks, { type: fileInfo.type });
+
+        if (onBlobReady) {
+            onBlobReady(blob);
+        } else {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileInfo.name;
+            link.click();
+            URL.revokeObjectURL(url);
+            showToast("Download complete!");
+        }
+        if (statusEl) statusEl.innerText = 'Tap to Download';
+    } catch (error) {
+        console.error("Download & Combine Error:", error);
+        alert("Download failed: " + error.message);
+        showToast("Error during download.");
+        if (statusEl) statusEl.innerText = 'Download Failed';
+    }
 }
 
 chatFileInput.addEventListener('change', handleFileSelect);
@@ -6285,6 +6517,7 @@ retakeBtn.addEventListener('click', () => {
     baseImageForFilter = null;
     currentFilterMode = 0;
     currentFileData = null;
+    currentFileChunks = null;
     currentVideoBase64 = null;
     const info = document.getElementById('file-preview-info');
     if(info) info.style.display = 'none';
@@ -6376,7 +6609,7 @@ filterBtn.addEventListener('click', () => {
     img.src = baseImageForFilter;
 });
 
-sendImageBtn.addEventListener('click', () => {
+sendImageBtn.addEventListener('click', async () => {
     if (currentChatPartner && blockedUsersSet.has(currentChatPartner)) {
         showUnblockPrompt();
         return;
@@ -6406,24 +6639,27 @@ sendImageBtn.addEventListener('click', () => {
             replyTo: null
         };
 
-        if (currentImageBase64) {
+        if (currentFileData && currentFileData.isChunked) {
+            // Let it run in the background for large files (image or other)
+            uploadFileInChunks(msgData, currentFileData, currentFileChunks, newMsgRef);
+        } else if (currentImageBase64) {
             msgData.image = currentImageBase64;
+            newMsgRef.set(msgData).catch(err => console.error("Send Error:", err));
         } else if (currentFileData) {
             msgData.file = currentFileData;
+            newMsgRef.set(msgData).catch(err => console.error("Send Error:", err));
         } else if (currentVideoBase64) {
             msgData.video = currentVideoBase64;
+            newMsgRef.set(msgData).catch(err => console.error("Send Error:", err));
         }
 
-        newMsgRef.set(msgData).catch(err => {
-            console.error("Send Error:", err);
-            alert("Failed to send. File might be too large.");
-        });
         sendNotificationAlert(recipient);
 
         // Cleanup
         imagePreviewOverlay.style.display = 'none';
         currentImageBase64 = null;
         currentFileData = null;
+        currentFileChunks = null;
         currentVideoBase64 = null;
         const info = document.getElementById('file-preview-info');
         if(info) info.style.display = 'none';
@@ -6434,6 +6670,62 @@ sendImageBtn.addEventListener('click', () => {
         }
     }
 });
+
+async function uploadFileInChunks(msgData, fileInfo, chunks, finalMsgRef) {
+    const totalChunks = chunks.length;
+    const chunkIds = [];
+    const tempId = `upload-${Date.now()}`;
+
+    // 1. Create a temporary message bubble in the UI
+    const tempMsgData = {
+        ...msgData,
+        id: tempId,
+        isUploading: true,
+        progress: 0,
+        file: { name: fileInfo.name }
+    };
+    renderTemporaryMessage(tempMsgData);
+
+    try {
+        for (let i = 0; i < totalChunks; i++) {
+            const chunkData = chunks[i];
+            const chunkRef = db.ref('file_chunks').push();
+            await chunkRef.set(chunkData);
+            chunkIds.push(chunkRef.key);
+
+            // 2. Update the progress in the UI
+            const progress = Math.round(((i + 1) / totalChunks) * 100);
+            const progressBubble = document.querySelector(`.file-upload-progress[data-upload-id="${tempId}"]`);
+            if (progressBubble) {
+                const statusEl = progressBubble.querySelector('.file-status-text');
+                if (statusEl) statusEl.innerText = `Uploading ${progress}%...`;
+            }
+        }
+
+        // 3. All chunks uploaded, set the final message in Firebase
+        const finalMsgData = { ...msgData };
+        // If it's a chunked image, send it as an 'image' field for correct rendering
+        if (fileInfo.isImage) {
+            finalMsgData.image = { ...fileInfo, chunkIds: chunkIds };
+        } else {
+            finalMsgData.file = { ...fileInfo, chunkIds: chunkIds };
+        }
+        // FIX: The 'data' property only exists on small, non-chunked files.
+        // It's not present in the chunked 'fileInfo' object, so this delete is unnecessary and causes an error.
+        // We can safely remove this line.
+        await finalMsgRef.set(finalMsgData); 
+
+        // 4. Remove the temporary bubble (the real-time listener will add the final one)
+        const tempBubble = document.getElementById(`msg-${tempId}`);
+        if (tempBubble) tempBubble.remove();
+
+    } catch (error) {
+        console.error("Chunk upload failed:", error);
+        alert("Failed to upload file chunks.");
+        const tempBubble = document.getElementById(`msg-${tempId}`);
+        if (tempBubble) tempBubble.remove(); // Clean up on failure
+    }
+}
 
 function downloadViewerMedia(mode) {
     const img = document.getElementById('viewerImage');
@@ -6504,6 +6796,47 @@ async function shareViewerMedia() {
     }
 }
 
+function renderTemporaryMessage(msg) {
+    // This is a simplified version of the render logic, specifically for the upload bubble
+    const msgDiv = document.createElement('div');
+    const isSent = msg.sender === currentUser;
+    msgDiv.classList.add('message-bubble', isSent ? 'msg-sent' : 'msg-received');
+    msgDiv.id = 'msg-' + msg.id;
+
+    // Create and append the file display element
+    const fileDiv = document.createElement('div');
+    fileDiv.style.cssText = 'background: rgba(0,0,0,0.1); padding: 10px; border-radius: 8px; margin: 5px 0; max-width: 250px;';
+    fileDiv.classList.add('file-upload-progress');
+    fileDiv.dataset.uploadId = msg.id;
+
+    const fileIconSVG = `
+        <div class="icon-btn" style="width: 40px; height: 40px; flex-shrink: 0;">
+            <svg viewBox="0 0 24 24" style="--paper: #f0f0f0; --icon-color: #888;">
+                <path d="M7 2.8h7l4.2 4.2V20a1.6 1.6 0 0 1-1.6 1.6H7.8A1.6 1.6 0 0 1 6.2 20V4.4A1.6 1.6 0 0 1 7.8 2.8z"
+                fill="var(--paper)" stroke="var(--icon-color)" stroke-width="1.5"/>
+                <path d="M14 2.8V8h4.2" fill="none" stroke="var(--icon-color)" stroke-width="1.5"/>
+                <line x1="9" y1="12" x2="15" y2="12" stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
+                <line x1="9" y1="15" x2="15" y2="15" stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
+                <line x1="9" y1="18" x2="13.5" y2="18" stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+        </div>`;
+
+    fileDiv.innerHTML = `
+        <div style="text-decoration:none; color:inherit; display:flex; align-items:center; gap:10px;">
+            ${fileIconSVG}
+            <div style="overflow:hidden;">
+                <div style="font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${msg.file.name}</div>
+                <div class="file-status-text" style="font-size:10px; opacity:0.7;">Uploading ${msg.progress}%...</div>
+            </div>
+        </div>
+    `;
+    msgDiv.appendChild(fileDiv);
+
+    // Append the whole message bubble to the chat
+    chatMessages.appendChild(msgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
 // --- Image Viewer Logic (Zoom, Pan, & Navigation) ---
 
 let currentViewerImages = [];
@@ -6553,7 +6886,18 @@ function openImageViewer(msgId, defaultSrc) {
 function updateImageViewer() {
     if (currentViewerIndex >= 0 && currentViewerIndex < currentViewerImages.length) {
         const msg = currentViewerImages[currentViewerIndex];
-        viewerImage.src = msg.image;
+
+        // **FIX**: Check if the image is a chunked object or a simple Base64 string.
+        if (typeof msg.image === 'object' && msg.image.isChunked) {
+            // For chunked images, show a placeholder and download the full image.
+            viewerImage.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; // Transparent placeholder
+            downloadAndCombineChunks(msg.image, (blob) => {
+                viewerImage.src = URL.createObjectURL(blob);
+            });
+        } else {
+            // For small images, just set the src directly.
+            viewerImage.src = msg.image;
+        }
         viewerImage.dataset.msgId = msg.id;
 
         const prevBtn = document.getElementById('viewerPrevBtn');
