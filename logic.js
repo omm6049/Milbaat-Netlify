@@ -1545,6 +1545,7 @@ if (!bgImage && bgOverlay) {
     const editBtn = createDropBtn('selEditBtn', 'Edit');
     const unsendBtn = createDropBtn('selUnsendBtn', 'Unsend');
     const deleteBtn = createDropBtn('selDeleteBtn', 'Delete');
+    const shareBtn = createDropBtn('selShareBtn', 'Share');
 
     dropdown.appendChild(pinBtn);
     dropdown.appendChild(editBtn);
@@ -1552,6 +1553,7 @@ if (!bgImage && bgOverlay) {
     dropdown.appendChild(deleteBtn);
 
     rightGroup.appendChild(dropdown);
+    dropdown.appendChild(shareBtn);
     header.appendChild(rightGroup);
 
     threeDotsBtn.onclick = (e) => {
@@ -1639,6 +1641,11 @@ if (!bgImage && bgOverlay) {
         if (selectedMsgIds.size === 0) return;
         deleteMsgModal.style.display = 'flex';
         mainContent.classList.add('blur-content');
+    };
+
+    document.getElementById('selShareBtn').onclick = () => {
+        shareSelectedMessageFile();
+        exitSelectionMode();
     };
 })();
 
@@ -2154,6 +2161,7 @@ function updateSelectionHeaderIcons() {
     const pinBtn = document.getElementById('selPinBtn');
     const copyBtn = document.getElementById('selCopyBtn');
     const forwardBtn = document.getElementById('selForwardBtn');
+    const shareBtn = document.getElementById('selShareBtn');
     const counter = document.getElementById('selCounter');
     
     if (counter) counter.innerText = selectedMsgIds.size;
@@ -2164,6 +2172,7 @@ function updateSelectionHeaderIcons() {
     let canUnsend = false;
     let canPin = (selectedMsgIds.size === 1);
     let canCopy = false;
+    let canShare = false;
     let canForward = (selectedMsgIds.size > 0);
 
     if (selectedMsgIds.size === 1) {
@@ -2176,6 +2185,10 @@ function updateSelectionHeaderIcons() {
         // Copy Criteria: Has Text
         if (msg && msg.text) {
             canCopy = true;
+        }
+        // Share Criteria: Has any kind of file
+        if (msg && (msg.image || msg.video || msg.audio || msg.file)) {
+            canShare = true;
         }
     }
 
@@ -2197,6 +2210,7 @@ function updateSelectionHeaderIcons() {
     setState(unsendBtn, canUnsend);
     setState(pinBtn, canPin);
     setState(copyBtn, canCopy);
+    setState(shareBtn, canShare);
     if (forwardBtn) setState(forwardBtn, canForward);
 }
 
@@ -6313,7 +6327,7 @@ function handleFileSelect(event) {
                         }
                     }
                     info.style.display = 'block';
-                    info.innerHTML = `${fileIconSVG}<h3 style="word-break: break-all; max-width: 80vw; margin-top: 10px;">${file.name}</h3><p>${(file.size/1024/1024).toFixed(2)} MB</p>`;
+                info.innerHTML = `${fileIconSVG}<h3 style="word-break: break-all; max-width: 80vw; margin-top: 10px;">${file.name}</h3><p>${(file.size/1024/1024).toFixed(2)} MB</p>`;
                     imagePreviewOverlay.style.display = 'flex';
                 };
                 currentFileData = { name: file.name, type: file.type, isChunked: true };
@@ -6421,6 +6435,64 @@ function handleFileSelect(event) {
     }
     // Reset input so same file can be selected again
     event.target.value = '';
+}
+
+async function sharePreviewFile() {
+    if (!currentFileData) {
+        showToast("No file selected to share.");
+        return;
+    }
+
+    if (!navigator.share || !navigator.canShare) {
+        showToast("Sharing is not supported on your browser.");
+        return;
+    }
+
+    try {
+        let fileBlob;
+
+        if (currentFileData.isChunked && currentFileChunks) {
+            // Reconstruct from chunks
+            const binaryChunks = currentFileChunks.map(base64Chunk => {
+                const byteCharacters = atob(base64Chunk);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let j = 0; j < byteCharacters.length; j++) {
+                    byteNumbers[j] = byteCharacters.charCodeAt(j);
+                }
+                return new Uint8Array(byteNumbers);
+            });
+            fileBlob = new Blob(binaryChunks, { type: currentFileData.type });
+        } else if (currentFileData.data) {
+            // Reconstruct from single base64 string
+            const byteCharacters = atob(currentFileData.data);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            fileBlob = new Blob([byteArray], { type: currentFileData.type });
+        } else {
+            showToast("File data is not available for sharing.");
+            return;
+        }
+
+        const fileToShare = new File([fileBlob], currentFileData.name, { type: currentFileData.type });
+
+        if (navigator.canShare({ files: [fileToShare] })) {
+            await navigator.share({
+                files: [fileToShare],
+                title: 'Shared from Mil Baat',
+                text: currentFileData.name,
+            });
+        } else {
+            showToast("This file type cannot be shared.");
+        }
+    } catch (error) {
+        if (error.name !== 'AbortError') {
+            console.error('Share error:', error);
+            showToast("Could not share the file.");
+        }
+    }
 }
 
 async function sliceAndEncode(file, chunkSize, onComplete) {
