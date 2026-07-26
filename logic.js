@@ -1551,9 +1551,9 @@ if (!bgImage && bgOverlay) {
     dropdown.appendChild(editBtn);
     dropdown.appendChild(unsendBtn);
     dropdown.appendChild(deleteBtn);
+    dropdown.appendChild(shareBtn);
 
     rightGroup.appendChild(dropdown);
-    dropdown.appendChild(shareBtn);
     header.appendChild(rightGroup);
 
     threeDotsBtn.onclick = (e) => {
@@ -1644,7 +1644,9 @@ if (!bgImage && bgOverlay) {
     };
 
     document.getElementById('selShareBtn').onclick = () => {
-        shareSelectedMessageFile();
+        if (typeof shareSelectedMessageFile === 'function') {
+            shareSelectedMessageFile();
+        }
         exitSelectionMode();
     };
 })();
@@ -2210,7 +2212,7 @@ function updateSelectionHeaderIcons() {
     setState(unsendBtn, canUnsend);
     setState(pinBtn, canPin);
     setState(copyBtn, canCopy);
-    setState(shareBtn, canShare);
+    if (shareBtn) setState(shareBtn, canShare);
     if (forwardBtn) setState(forwardBtn, canForward);
 }
 
@@ -6437,9 +6439,9 @@ function handleFileSelect(event) {
     event.target.value = '';
 }
 
-async function sharePreviewFile() {
-    if (!currentFileData) {
-        showToast("No file selected to share.");
+async function shareSelectedMessageFile() {
+    if (selectedMsgIds.size !== 1) {
+        showToast("Please select a single file message to share.");
         return;
     }
 
@@ -6448,50 +6450,58 @@ async function sharePreviewFile() {
         return;
     }
 
+    const msgId = Array.from(selectedMsgIds)[0];
+    const msg = currentChatHistory.find(m => m.id === msgId);
+
+    if (!msg || (!msg.image && !msg.video && !msg.audio && !msg.file)) {
+        showToast("This message does not contain a shareable file.");
+        return;
+    }
+
     try {
         let fileBlob;
+        let fileName = `MilBaat_Media_${Date.now()}`;
+        let fileType = 'application/octet-stream';
 
-        if (currentFileData.isChunked && currentFileChunks) {
-            // Reconstruct from chunks
-            const binaryChunks = currentFileChunks.map(base64Chunk => {
-                const byteCharacters = atob(base64Chunk);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let j = 0; j < byteCharacters.length; j++) {
-                    byteNumbers[j] = byteCharacters.charCodeAt(j);
-                }
-                return new Uint8Array(byteNumbers);
+        const fileData = msg.image || msg.video || msg.audio || msg.file;
+
+        if (typeof fileData === 'object' && fileData.isChunked) {
+            // This is a large file stored in chunks
+            fileName = fileData.name;
+            fileType = fileData.type;
+            await new Promise((resolve, reject) => {
+                downloadAndCombineChunks(fileData, (blob) => {
+                    if (blob) {
+                        fileBlob = blob;
+                        resolve();
+                    } else {
+                        reject(new Error("Failed to reconstruct file from chunks."));
+                    }
+                });
             });
-            fileBlob = new Blob(binaryChunks, { type: currentFileData.type });
-        } else if (currentFileData.data) {
-            // Reconstruct from single base64 string
-            const byteCharacters = atob(currentFileData.data);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            fileBlob = new Blob([byteArray], { type: currentFileData.type });
         } else {
-            showToast("File data is not available for sharing.");
-            return;
+            // This is a smaller file stored as a Base64 string or simple object
+            const base64String = (typeof fileData === 'string') ? fileData.split(',')[1] : fileData.data;
+            if (!base64String) throw new Error("File data is corrupt or missing.");
+
+            fileType = fileData.type || (msg.image ? 'image/jpeg' : (msg.video ? 'video/mp4' : (msg.audio ? 'audio/webm' : fileType)));
+            fileName = fileData.name || fileName + '.' + (fileType.split('/')[1] || 'bin');
+            
+            const byteCharacters = atob(base64String);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
+            fileBlob = new Blob([new Uint8Array(byteNumbers)], { type: fileType });
         }
 
-        const fileToShare = new File([fileBlob], currentFileData.name, { type: currentFileData.type });
+        const fileToShare = new File([fileBlob], fileName, { type: fileType });
 
         if (navigator.canShare({ files: [fileToShare] })) {
-            await navigator.share({
-                files: [fileToShare],
-                title: 'Shared from Mil Baat',
-                text: currentFileData.name,
-            });
+            await navigator.share({ files: [fileToShare], title: 'Shared from Mil Baat', text: fileName });
         } else {
             showToast("This file type cannot be shared.");
         }
     } catch (error) {
-        if (error.name !== 'AbortError') {
-            console.error('Share error:', error);
-            showToast("Could not share the file.");
-        }
+        if (error.name !== 'AbortError') console.error('Share error:', error);
     }
 }
 
