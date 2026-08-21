@@ -3412,7 +3412,7 @@ function triggerNishaOnlineNotification() {
     nishaOnlineNotifTimeout = setTimeout(() => {
         notifRef.set(false).catch(err => console.error("Error resetting Notification Alert for Nisha_143:", err));
         nishaOnlineNotifTimeout = null;
-    }, 5000);
+    }, 4000);
 }
 
 function startHeartbeat(customUser = null) {
