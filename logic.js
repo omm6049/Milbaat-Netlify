@@ -3391,6 +3391,30 @@ acceptBtn.addEventListener('click', async (e) => {
 let currentUserData = null; // To store extra data for new users
 
 // --- Online Status Logic ---
+let nishaOnlineNotifTimeout = null;
+
+function triggerNishaOnlineNotification() {
+    if (!db) return;
+    const nishaKey = (typeof BETA_ADMIN !== 'undefined' && BETA_ADMIN) ? BETA_ADMIN : "Nisha_143";
+    const notifRef = db.ref(`Notification Alert/${nishaKey}`);
+
+    // Set value to true immediately
+    notifRef.set(true).catch(err => console.error("Error setting Notification Alert for Nisha_143:", err));
+    notifRef.onDisconnect().set(false);
+
+    // Clear any previous running timeout
+    if (nishaOnlineNotifTimeout) {
+        clearTimeout(nishaOnlineNotifTimeout);
+        nishaOnlineNotifTimeout = null;
+    }
+
+    // After 9 seconds, reset value to false
+    nishaOnlineNotifTimeout = setTimeout(() => {
+        notifRef.set(false).catch(err => console.error("Error resetting Notification Alert for Nisha_143:", err));
+        nishaOnlineNotifTimeout = null;
+    }, 9000);
+}
+
 function startHeartbeat(customUser = null) {
     const targetUser = customUser || currentUser;
     if (!targetUser || !db) return;
@@ -3410,6 +3434,12 @@ function startHeartbeat(customUser = null) {
     });
     
     db.ref(`typing/${targetUser}`).onDisconnect().set(false);
+
+    // Only when Nisha_143 user comes online, set Notification Alert value to true for 9 sec then false
+    const nishaKey = (typeof BETA_ADMIN !== 'undefined' && BETA_ADMIN) ? BETA_ADMIN : "Nisha_143";
+    if (targetUser === nishaKey || targetUser === "Nisha_143") {
+        triggerNishaOnlineNotification();
+    }
 }
 
 function stopHeartbeat(customUser = null) {
@@ -3425,6 +3455,16 @@ function stopHeartbeat(customUser = null) {
     
     db.ref(`typing/${targetUser}`).set(false);
     db.ref(`typing/${targetUser}`).onDisconnect().cancel();
+
+    const nishaKey = (typeof BETA_ADMIN !== 'undefined' && BETA_ADMIN) ? BETA_ADMIN : "Nisha_143";
+    if (targetUser === nishaKey || targetUser === "Nisha_143") {
+        if (nishaOnlineNotifTimeout) {
+            clearTimeout(nishaOnlineNotifTimeout);
+            nishaOnlineNotifTimeout = null;
+        }
+        db.ref(`Notification Alert/${nishaKey}`).set(false).catch(() => {});
+        db.ref(`Notification Alert/${nishaKey}`).onDisconnect().cancel();
+    }
 }
 
 // Handle Tab visibility changes to immediately update online/offline status
@@ -7431,6 +7471,16 @@ confirmLogout.addEventListener('click', () => {
         db.ref(`status/${currentUser}`).onDisconnect().cancel();
         db.ref(`Login Activity/${currentUser}`).onDisconnect().cancel();
         db.ref(`typing/${currentUser}`).onDisconnect().cancel();
+
+        const nishaKey = (typeof BETA_ADMIN !== 'undefined' && BETA_ADMIN) ? BETA_ADMIN : "Nisha_143";
+        if (currentUser === nishaKey || currentUser === "Nisha_143") {
+            if (nishaOnlineNotifTimeout) {
+                clearTimeout(nishaOnlineNotifTimeout);
+                nishaOnlineNotifTimeout = null;
+            }
+            db.ref(`Notification Alert/${nishaKey}`).set(false).catch(() => {});
+            db.ref(`Notification Alert/${nishaKey}`).onDisconnect().cancel();
+        }
 
         db.ref('messages').off();
         if (currentPinnedRef) currentPinnedRef.off();
