@@ -40,6 +40,7 @@ const headerTypingIndicator = document.getElementById('headerTypingIndicator');
 const lastSeenDisplay = document.getElementById('lastSeenDisplay');
 const typingIndicator = document.getElementById('typingIndicator');
 const clearChatBtn = document.getElementById('clearChatBtn');
+const refreshChatBtn = document.getElementById('refreshChatBtn');
 const exportChatBtn = document.getElementById('exportChatBtn');
 const deleteMsgModal = document.getElementById('delete-msg-modal');
 const confirmDeleteMsg = document.getElementById('confirmDeleteMsg');
@@ -65,6 +66,10 @@ const attachBtn = document.getElementById('attachBtn');
 const cameraBtn = document.getElementById('cameraBtn');
 const micBtn = document.getElementById('micBtn');
 const chatFileInput = document.getElementById('chatFileInput');
+const chatPhotoInput = document.getElementById('chatPhotoInput');
+const attachmentDropup = document.getElementById('attachmentDropup');
+const attachPhotoOption = document.getElementById('attachPhotoOption');
+const attachFileOption = document.getElementById('attachFileOption');
 const chatCameraInput = document.getElementById('chatCameraInput');
 const imagePreviewOverlay = document.getElementById('image-preview-overlay');
 const previewImage = document.getElementById('previewImage');
@@ -146,6 +151,7 @@ function showLogoutModal() {
 }
 
 headerLogoutBtn.addEventListener('click', () => {
+    if (typeof window.hideScrollToBottomBtn === 'function') window.hideScrollToBottomBtn();
     if (currentUser === ALPHA_ADMIN) {
         if (typeof showAlphaHomeScreen === 'function') showAlphaHomeScreen();
     } else {
@@ -438,6 +444,9 @@ window.updateHeaderProfilePic = function () {
             });
 
             chatInputBar.prepend(inputWrapper);
+            if (attachmentDropup && !chatInputBar.contains(attachmentDropup)) {
+                chatInputBar.appendChild(attachmentDropup);
+            }
 
             // Style Mic & Send Buttons (Inside Shared Circle)
             const actionContainer = document.createElement('div');
@@ -510,7 +519,7 @@ window.updateHeaderProfilePic = function () {
     style.innerHTML = `
         #scrollToBottomBtn {
             position: absolute;
-            bottom: 80px; /* Just above the 60px footer */
+            bottom: 80px; /* Just above the 60px/70px footer */
             right: 15px;
             width: 40px;
             height: 40px;
@@ -554,7 +563,11 @@ window.updateHeaderProfilePic = function () {
         <svg viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px;"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>
         <div id="scrollUnreadBadge">0</div>
     `;
-    document.body.appendChild(scrollBtn);
+    if (mainContent) {
+        mainContent.appendChild(scrollBtn);
+    } else {
+        document.body.appendChild(scrollBtn);
+    }
 
     window.scrollUnreadCount = 0;
     window.updateScrollBadge = function (count) {
@@ -570,15 +583,41 @@ window.updateHeaderProfilePic = function () {
         }
     };
 
+    window.hideScrollToBottomBtn = function () {
+        const btn = document.getElementById('scrollToBottomBtn');
+        if (btn) btn.style.display = 'none';
+        window.updateScrollBadge(0);
+    };
+
+    window.checkScrollToBottomVisibility = function () {
+        const btn = document.getElementById('scrollToBottomBtn');
+        if (!btn) return;
+
+        // Only show if inside an active chat page where chatMessages is visible
+        const isChatVisible = Boolean(
+            chatMessages &&
+            chatMessages.style.display !== 'none' &&
+            chatMessages.offsetParent !== null &&
+            (typeof currentUser === 'undefined' || currentUser !== ALPHA_ADMIN || currentChatPartner)
+        );
+
+        if (!isChatVisible) {
+            btn.style.display = 'none';
+            return;
+        }
+
+        // Show button if user scrolls up by more than 150px
+        const isScrolledUp = (chatMessages.scrollHeight - chatMessages.scrollTop) > (chatMessages.clientHeight + 150);
+        btn.style.display = isScrolledUp ? 'flex' : 'none';
+
+        if (!isScrolledUp && window.scrollUnreadCount > 0) {
+            window.updateScrollBadge(0);
+        }
+    };
+
     if (chatMessages) {
         chatMessages.addEventListener('scroll', () => {
-            // Show button if user scrolls up by more than 150px
-            const isScrolledUp = (chatMessages.scrollHeight - chatMessages.scrollTop) > (chatMessages.clientHeight + 150);
-            scrollBtn.style.display = isScrolledUp ? 'flex' : 'none';
-
-            if (!isScrolledUp && window.scrollUnreadCount > 0) {
-                window.updateScrollBadge(0);
-            }
+            window.checkScrollToBottomVisibility();
         });
     }
 
@@ -587,6 +626,11 @@ window.updateHeaderProfilePic = function () {
         if (chatMessages) {
             chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
         }
+        setTimeout(() => {
+            if (typeof window.checkScrollToBottomVisibility === 'function') {
+                window.checkScrollToBottomVisibility();
+            }
+        }, 300);
     });
 })();
 
@@ -3683,7 +3727,7 @@ menuIconBtn.addEventListener('click', (e) => {
         const isBeta = (currentUser === BETA_ADMIN);
 
         const order = [
-            'profileBtn', 'themeToggleBtn', 'alphaStatusBtn', 'menuBackToBetaBtn',
+            'profileBtn', 'refreshChatBtn', 'themeToggleBtn', 'alphaStatusBtn', 'menuBackToBetaBtn',
             'menuPendingBtn', 'menuAddFriendBtn', 'menuFriendsBtn',
             'clearChatBtn', 'exportChatBtn', 'changePassBtn', 'changeFontBtn', 'logoutBtn'
         ];
@@ -3694,8 +3738,8 @@ menuIconBtn.addEventListener('click', (e) => {
                 // Determine Visibility
                 let isVisible = true;
                 if (isAlpha) {
-                    // Alpha: Only Profile, Clear Chat & Export Chat
-                    if (id !== 'profileBtn' && id !== 'clearChatBtn' && id !== 'exportChatBtn') isVisible = false;
+                    // Alpha: Profile, Refresh, Clear Chat & Export Chat
+                    if (id !== 'profileBtn' && id !== 'refreshChatBtn' && id !== 'clearChatBtn' && id !== 'exportChatBtn') isVisible = false;
                     if (id === 'exportChatBtn' && !currentChatPartner) isVisible = false; // Only show in chat
                 } else {
                     if (id === 'menuBackToBetaBtn') isVisible = false;
@@ -3816,6 +3860,117 @@ if (landingLogo) {
         } else {
             lastTapTime = currentTime;
         }
+    });
+}
+
+// --- Manual Refresh Logic ---
+async function performManualRefresh() {
+    if (!db) return;
+    showToast("Refreshing...");
+
+    try {
+        // 1. Refresh User Online/Offline Status & Last Seen
+        if (currentUser) {
+            db.ref(`status/${currentUser}`).update({
+                online: true,
+                lastSeen: Date.now()
+            }).catch(() => {});
+        }
+
+        const targetPartner = currentChatPartner || (currentUser === ALPHA_ADMIN ? null : ALPHA_ADMIN);
+
+        if (targetPartner) {
+            const statusSnap = await db.ref(`status/${targetPartner}`).once('value');
+            const partnerData = statusSnap.val() || {};
+            otherUserOnlineStatus = partnerData.online || false;
+            otherUserLastSeen = partnerData.lastSeen || null;
+
+            // Refresh typing status
+            const typingSnap = await db.ref('typing').once('value');
+            const typingData = typingSnap.val() || {};
+            isOtherUserTyping = (typingData[targetPartner] === true);
+
+            // Update UI status immediately
+            updateStatusUI(otherUserOnlineStatus, otherUserLastSeen, isOtherUserTyping);
+        }
+
+        // For Alpha Admin: refresh statuses and typing for all friends
+        if (currentUser === ALPHA_ADMIN) {
+            const allStatusSnap = await db.ref('status').once('value');
+            latestAlphaStatusData = allStatusSnap.val() || {};
+            const allTypingSnap = await db.ref('typing').once('value');
+            latestTypingData = allTypingSnap.val() || {};
+            if (typeof updateAlphaListStatus === 'function') {
+                updateAlphaListStatus();
+            }
+        }
+
+        // 2. Refresh Messages & Message Statuses (Sent/Received)
+        const msgSnap = await db.ref('messages').once('value');
+        const data = msgSnap.val();
+        let raw = [];
+        if (data) {
+            Object.keys(data).forEach(key => {
+                const msgs = data[key];
+                if (msgs && typeof msgs === 'object') {
+                    Object.values(msgs).forEach(m => {
+                        if (m && typeof m === 'object') {
+                            m._tableName = key;
+                            raw.push(m);
+                        }
+                    });
+                }
+            });
+        }
+        allMessagesRaw = raw;
+
+        // If in active chat, mark unread received messages as seen in Firebase
+        if (currentUser && currentChatPartner) {
+            const updates = {};
+            const now = new Date();
+            const d = String(now.getDate()).padStart(2, '0');
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const y = now.getFullYear();
+            const datePart = `${d}/${m}/${y}`;
+            const timePart = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
+            const seenTime = `${datePart} ${timePart}`;
+
+            raw.forEach(msg => {
+                if (msg && msg.id && msg.sender === currentChatPartner && msg.recipient === currentUser && msg.status !== 'seen') {
+                    const table = msg._tableName || getMessageTable(msg.sender);
+                    updates[`messages/${table}/${msg.id}/status`] = 'seen';
+                    updates[`messages/${table}/${msg.id}/seenTimestamp`] = seenTime;
+                    msg.status = 'seen';
+                    msg.seenTimestamp = seenTime;
+                }
+            });
+
+            if (Object.keys(updates).length > 0) {
+                await db.ref().update(updates).catch(() => {});
+            }
+        }
+
+        // Re-filter and re-render the chat messages (refresh ticks, bubble statuses, etc.)
+        filterAndRenderChat();
+
+        // 3. Refresh unread badges and friend list if applicable
+        if (currentUser === ALPHA_ADMIN) {
+            if (typeof updateAlphaUnreadBadges === 'function') updateAlphaUnreadBadges();
+            if (!currentChatPartner && typeof renderAlphaFriendList === 'function') renderAlphaFriendList();
+        }
+
+        showToast("Refreshed! ✅");
+    } catch (err) {
+        console.error("Error performing manual refresh:", err);
+        showToast("Refreshed! ✅");
+    }
+}
+
+if (refreshChatBtn) {
+    refreshChatBtn.addEventListener('click', async () => {
+        if (menuOptions) menuOptions.style.display = 'none';
+        if (menuIconBtn) menuIconBtn.classList.remove('rotate');
+        await performManualRefresh();
     });
 }
 
@@ -4826,6 +4981,9 @@ function handleViewportResize() {
         scrollBtn.style.position = 'absolute';
         scrollBtn.style.bottom = '80px';
         scrollBtn.style.top = 'auto';
+        if (typeof window.checkScrollToBottomVisibility === 'function') {
+            window.checkScrollToBottomVisibility();
+        }
     }
 
     // Keep Chat Messages container correctly sized
@@ -4957,15 +5115,59 @@ sendMsgBtn.addEventListener('click', () => {
     }
 });
 
-// --- Chat Actions (Attachment, Camera, Mic) ---
-attachBtn.addEventListener('click', () => {
+// --- Chat Actions (Attachment Drop-up, Camera, Mic) ---
+attachBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
     if (currentChatPartner && blockedUsersSet.has(currentChatPartner)) {
         showUnblockPrompt();
         return;
     }
-    chatFileInput.click();
-    // Ensure we accept all files
-    chatFileInput.removeAttribute('accept');
+    if (attachmentDropup) {
+        const isVisible = attachmentDropup.style.display === 'flex';
+        attachmentDropup.style.display = isVisible ? 'none' : 'flex';
+    }
+    const emojiPicker = document.getElementById('emoji-picker');
+    if (emojiPicker) emojiPicker.style.display = 'none';
+});
+
+if (attachPhotoOption) {
+    attachPhotoOption.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (attachmentDropup) attachmentDropup.style.display = 'none';
+        if (currentChatPartner && blockedUsersSet.has(currentChatPartner)) {
+            showUnblockPrompt();
+            return;
+        }
+        if (chatPhotoInput) {
+            chatPhotoInput.value = '';
+            chatPhotoInput.click();
+        }
+    });
+}
+
+if (attachFileOption) {
+    attachFileOption.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (attachmentDropup) attachmentDropup.style.display = 'none';
+        if (currentChatPartner && blockedUsersSet.has(currentChatPartner)) {
+            showUnblockPrompt();
+            return;
+        }
+        if (chatFileInput) {
+            chatFileInput.value = '';
+            chatFileInput.removeAttribute('accept');
+            chatFileInput.click();
+        }
+    });
+}
+
+// Close attachment dropup when clicking outside
+document.addEventListener('click', (e) => {
+    if (attachmentDropup && attachmentDropup.style.display === 'flex') {
+        if (!attachmentDropup.contains(e.target) && e.target !== attachBtn && !attachBtn.contains(e.target)) {
+            attachmentDropup.style.display = 'none';
+        }
+    }
 });
 
 // --- Live Camera Logic ---
@@ -6297,185 +6499,281 @@ function sendAudioMessage(base64Audio) {
     sendNotificationAlert(recipient);
 }
 
-// --- Image Preview & Send Logic ---
-function handleFileSelect(event) {
-    const file = event.target.files[0];
-    if (file) {
-        lastImageSource = 'file';
-        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
+// --- Image Compression & Preview Logic ---
+
+/**
+ * Compresses an image file (specifically targeting images > 5MB and <= 15MB, or any large image)
+ * down to approximately ~3MB (target ~2.6MB - 3.2MB) while maximizing visual clarity and resolution.
+ * @param {File} file The selected image file
+ * @returns {Promise<string>} Base64 Data URL of the compressed image
+ */
+async function compressImageToNear3MB(file) {
+    return new Promise((resolve, reject) => {
         const reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = function (e) {
+            const img = new Image();
+            img.onerror = reject;
+            img.onload = function () {
+                try {
+                    let width = img.naturalWidth || img.width;
+                    let height = img.naturalHeight || img.height;
 
-        // Check if it is an image
-        if (file.type.startsWith('image/')) {
-            const showImagePreview = (imgSrc) => {
-                previewImage.src = imgSrc;
-                previewImage.style.display = 'block';
-                cropBtn.style.display = 'flex';
-                filterBtn.style.display = 'flex';
-                retakeBtn.style.display = 'flex';
-                const info = document.getElementById('file-preview-info');
-                if (info) info.style.display = 'none';
-                const vidPreview = document.getElementById('previewVideo');
-                if (vidPreview) vidPreview.style.display = 'none';
-                imagePreviewOverlay.style.display = 'flex';
-            };
-
-            if (file.size <= CHUNK_SIZE) {
-                // Handle small images normally
-                reader.onload = function (e) {
-                    currentImageBase64 = e.target.result;
-                    baseImageForFilter = currentImageBase64;
-                    currentFileData = null;
-                    currentVideoBase64 = null;
-                    currentFileChunks = null;
-                    currentFilterMode = 0;
-                    showImagePreview(currentImageBase64);
-                };
-                reader.readAsDataURL(file);
-            } else {
-                // Handle large images as generic files
-                const fileIconSVG = `
-                <div class="icon-btn" style="width: 80px; height: 80px; margin-bottom: 10px;">
-                    <svg viewBox="0 0 24 24" style="--paper: #f0f0f0; --icon-color: #ccc;">
-                        <path d="M7 2.8h7l4.2 4.2V20a1.6 1.6 0 0 1-1.6 1.6H7.8A1.6 1.6 0 0 1 6.2 20V4.4A1.6 1.6 0 0 1 7.8 2.8z"
-                        fill="var(--paper)" stroke="var(--icon-color)" stroke-width="1.5"/>
-                        <path d="M14 2.8V8h4.2" fill="none"
-                        stroke="var(--icon-color)" stroke-width="1.5"/>
-                        <line x1="9" y1="12" x2="15" y2="12"
-                        stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
-                        <line x1="9" y1="15" x2="15" y2="15"
-                        stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
-                        <line x1="9" y1="18" x2="13.5" y2="18"
-                        stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
-                    </svg>
-                </div>`;
-
-                const showFilePreview = () => {
-                    currentImageBase64 = null;
-                    currentVideoBase64 = null;
-                    previewImage.style.display = 'none';
-                    cropBtn.style.display = 'none';
-                    filterBtn.style.display = 'none';
-                    retakeBtn.style.display = 'flex';
-                    let info = document.getElementById('file-preview-info');
-                    if (!info) {
-                        info = document.createElement('div');
-                        info.id = 'file-preview-info';
-                        info.style.color = 'white';
-                        info.style.textAlign = 'center';
-                        const container = previewImage.parentNode;
-                        if (container) {
-                            container.insertBefore(info, previewImage);
+                    // Modern cameras produce huge images (e.g. 6000x4000 = 24MP or 48MP)
+                    // If image resolution is massive (> 4096px), limit max dimension to 3840px (4K UHD)
+                    // which preserves extreme detail while preventing mobile browser canvas crashes.
+                    const MAX_DIM = 3840;
+                    if (width > MAX_DIM || height > MAX_DIM) {
+                        if (width > height) {
+                            height = Math.round((height * MAX_DIM) / width);
+                            width = MAX_DIM;
+                        } else {
+                            width = Math.round((width * MAX_DIM) / height);
+                            height = MAX_DIM;
                         }
                     }
-                    info.style.display = 'block';
-                    info.innerHTML = `${fileIconSVG}<h3 style="word-break: break-all; max-width: 80vw; margin-top: 10px;">${file.name}</h3><p>${(file.size / 1024 / 1024).toFixed(2)} MB</p>`;
-                    imagePreviewOverlay.style.display = 'flex';
-                };
-                currentFileData = { name: file.name, type: file.type, isChunked: true };
-                currentFileChunks = [];
-                sliceAndEncode(file, CHUNK_SIZE, showFilePreview);
-            }
-        } else if (file.type.startsWith('video/')) {
-            // Check file size
-            if (file.size > 20 * 1024 * 1024) {
-                alert("Video is too large. Maximum size is 20MB.");
-                event.target.value = '';
-                return;
-            }
-            reader.onload = function (e) {
-                currentVideoBase64 = e.target.result;
-                currentImageBase64 = null;
-                currentFileData = null;
-                currentFileChunks = null;
 
-                // Hide Image UI
-                previewImage.style.display = 'none';
-                cropBtn.style.display = 'none';
-                filterBtn.style.display = 'none';
-                const info = document.getElementById('file-preview-info');
-                if (info) info.style.display = 'none';
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
 
-                // Ensure send button is visible
-                sendImageBtn.style.display = 'flex';
-                retakeBtn.style.display = 'flex';
+                    // High-quality smoothing
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(img, 0, 0, width, height);
 
-                // Show Video Preview
-                let vidPreview = document.getElementById('previewVideo');
-                if (!vidPreview) {
-                    vidPreview = document.createElement('video');
-                    vidPreview.id = 'previewVideo';
-                    vidPreview.controls = true;
-                    vidPreview.style.cssText = 'max-width: 100%; max-height: 60vh; border-radius: 10px;';
-                    previewImage.parentNode.insertBefore(vidPreview, previewImage);
-                }
-                vidPreview.src = currentVideoBase64;
-                vidPreview.style.display = 'block';
+                    const MAX_BYTES = 3.2 * 1024 * 1024;    // ~3.2 MB upper bound
+                    const MIN_BYTES = 2.5 * 1024 * 1024;    // ~2.5 MB lower bound
 
-                imagePreviewOverlay.style.display = 'flex';
-            };
-        } else { // Handle PDF and other generic files
-            const fileIconSVG = `
-                <div class="icon-btn" style="width: 80px; height: 80px; margin-bottom: 10px;">
-                    <svg viewBox="0 0 24 24" style="--paper: #f0f0f0; --icon-color: #ccc;">
-                        <path d="M7 2.8h7l4.2 4.2V20a1.6 1.6 0 0 1-1.6 1.6H7.8A1.6 1.6 0 0 1 6.2 20V4.4A1.6 1.6 0 0 1 7.8 2.8z"
-                        fill="var(--paper)" stroke="var(--icon-color)" stroke-width="1.5"/>
-                        <path d="M14 2.8V8h4.2" fill="none"
-                        stroke="var(--icon-color)" stroke-width="1.5"/>
-                        <line x1="9" y1="12" x2="15" y2="12"
-                        stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
-                        <line x1="9" y1="15" x2="15" y2="15"
-                        stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
-                        <line x1="9" y1="18" x2="13.5" y2="18"
-                        stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
-                    </svg>
-                </div>`;
-
-            const showFilePreview = () => {
-                currentImageBase64 = null;
-                currentVideoBase64 = null;
-                previewImage.style.display = 'none';
-                cropBtn.style.display = 'none';
-                filterBtn.style.display = 'none';
-                retakeBtn.style.display = 'flex';
-                let info = document.getElementById('file-preview-info');
-                if (!info) {
-                    info = document.createElement('div');
-                    info.id = 'file-preview-info';
-                    info.style.color = 'white';
-                    info.style.textAlign = 'center';
-                    const container = previewImage.parentNode; // Get the direct parent of the preview image
-                    if (container) {
-                        container.insertBefore(info, previewImage);
-                    }
-                }
-                info.style.display = 'block';
-                info.innerHTML = `${fileIconSVG}<h3 style="word-break: break-all; max-width: 80vw; margin-top: 10px;">${file.name}</h3><p>${(file.size / 1024 / 1024).toFixed(2)} MB</p>`;
-                imagePreviewOverlay.style.display = 'flex';
-            };
-
-            if (file.size <= CHUNK_SIZE) { // Handle small generic files
-                reader.onload = function (e) {
-                    currentFileData = {
-                        name: file.name,
-                        type: file.type,
-                        data: e.target.result.substring(e.target.result.indexOf(',') + 1)
+                    // Helper to get DataURL and approximate byte size from canvas
+                    const getDataUrlWithSize = (q) => {
+                        const dataUrl = canvas.toDataURL('image/jpeg', q);
+                        const base64Str = dataUrl.split(',')[1] || '';
+                        const byteSize = Math.round((base64Str.length * 3) / 4);
+                        return { dataUrl, byteSize };
                     };
-                    currentFileChunks = null;
-                    showFilePreview();
-                };
-                reader.readAsDataURL(file);
-            } else {
-                // Handle large generic files (like PDFs)
-                showToast("Slicing large file...");
-                currentFileData = { name: file.name, type: file.type, isChunked: true };
-                currentFileChunks = [];
-                sliceAndEncode(file, CHUNK_SIZE, showFilePreview);
-            }
+
+                    // Try high quality first (0.94)
+                    let quality = 0.94;
+                    let res = getDataUrlWithSize(quality);
+
+                    if (res.byteSize <= MAX_BYTES) {
+                        console.log(`Image compressed with quality ${quality}: ${(res.byteSize / (1024 * 1024)).toFixed(2)} MB`);
+                        return resolve(res.dataUrl);
+                    }
+
+                    // Binary search for optimal quality between 0.60 and 0.94 to get near ~3MB
+                    let minQ = 0.60;
+                    let maxQ = 0.94;
+                    let bestRes = res;
+
+                    for (let iter = 0; iter < 7; iter++) {
+                        let midQ = (minQ + maxQ) / 2;
+                        let testRes = getDataUrlWithSize(midQ);
+                        bestRes = testRes;
+
+                        if (testRes.byteSize > MAX_BYTES) {
+                            maxQ = midQ;
+                        } else if (testRes.byteSize < MIN_BYTES) {
+                            minQ = midQ;
+                        } else {
+                            // Within optimal target window (~2.5MB to 3.2MB)
+                            break;
+                        }
+                    }
+
+                    // If still larger than 3.4MB (e.g. extremely complex/noisy image), scale canvas down slightly with high quality
+                    if (bestRes.byteSize > 3.4 * 1024 * 1024) {
+                        const scaleCanvas = document.createElement('canvas');
+                        scaleCanvas.width = Math.round(width * 0.82);
+                        scaleCanvas.height = Math.round(height * 0.82);
+                        const sCtx = scaleCanvas.getContext('2d');
+                        sCtx.imageSmoothingEnabled = true;
+                        sCtx.imageSmoothingQuality = 'high';
+                        sCtx.drawImage(canvas, 0, 0, scaleCanvas.width, scaleCanvas.height);
+
+                        const finalDataUrl = scaleCanvas.toDataURL('image/jpeg', 0.88);
+                        return resolve(finalDataUrl);
+                    }
+
+                    console.log(`Image compressed: original ${(file.size / (1024 * 1024)).toFixed(2)} MB -> final ${(bestRes.byteSize / (1024 * 1024)).toFixed(2)} MB`);
+                    resolve(bestRes.dataUrl);
+                } catch (err) {
+                    console.error("Compression processing error:", err);
+                    resolve(e.target.result);
+                }
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+// --- Photo Selection Handler (Photo option with auto compression) ---
+async function handlePhotoSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    lastImageSource = 'photo';
+
+    const showImagePreview = (imgSrc) => {
+        currentImageBase64 = imgSrc;
+        baseImageForFilter = currentImageBase64;
+        currentFileData = null;
+        currentVideoBase64 = null;
+        currentFileChunks = null;
+        currentFilterMode = 0;
+
+        previewImage.src = imgSrc;
+        previewImage.style.display = 'block';
+        cropBtn.style.display = 'flex';
+        filterBtn.style.display = 'flex';
+        retakeBtn.style.display = 'flex';
+        sendImageBtn.style.display = 'flex';
+
+        const info = document.getElementById('file-preview-info');
+        if (info) info.style.display = 'none';
+        const vidPreview = document.getElementById('previewVideo');
+        if (vidPreview) vidPreview.style.display = 'none';
+
+        imagePreviewOverlay.style.display = 'flex';
+    };
+
+    // If image is greater than 5MB (up to 15MB or larger), automatically compress to approx ~3MB preserving quality
+    if (file.size > 5 * 1024 * 1024) {
+        showToast(`Optimizing photo (${(file.size / 1024 / 1024).toFixed(1)}MB)...`);
+        try {
+            const compressedBase64 = await compressImageToNear3MB(file);
+            showImagePreview(compressedBase64);
+        } catch (err) {
+            console.error("Photo compression error, falling back:", err);
+            const reader = new FileReader();
+            reader.onload = (e) => showImagePreview(e.target.result);
+            reader.readAsDataURL(file);
         }
-        // Call readAsDataURL only for file types that need it and haven't been handled already.
+    } else {
+        // Image <= 5MB: Load directly
+        const reader = new FileReader();
+        reader.onload = (e) => showImagePreview(e.target.result);
+        reader.readAsDataURL(file);
     }
-    // Reset input so same file can be selected again
+
+    event.target.value = '';
+}
+
+// --- File Selection Handler (File option preserving original device name) ---
+function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    lastImageSource = 'file';
+    const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
+    const reader = new FileReader();
+
+    // Check if it is a video (videos have custom video preview/handling)
+    if (file.type.startsWith('video/')) {
+        if (file.size > 20 * 1024 * 1024) {
+            alert("Video is too large. Maximum size is 20MB.");
+            event.target.value = '';
+            return;
+        }
+        reader.onload = function (e) {
+            currentVideoBase64 = e.target.result;
+            currentImageBase64 = null;
+            currentFileData = null;
+            currentFileChunks = null;
+
+            // Hide Image UI
+            previewImage.style.display = 'none';
+            cropBtn.style.display = 'none';
+            filterBtn.style.display = 'none';
+            const info = document.getElementById('file-preview-info');
+            if (info) info.style.display = 'none';
+
+            sendImageBtn.style.display = 'flex';
+            retakeBtn.style.display = 'flex';
+
+            let vidPreview = document.getElementById('previewVideo');
+            if (!vidPreview) {
+                vidPreview = document.createElement('video');
+                vidPreview.id = 'previewVideo';
+                vidPreview.controls = true;
+                vidPreview.style.cssText = 'max-width: 100%; max-height: 60vh; border-radius: 10px;';
+                previewImage.parentNode.insertBefore(vidPreview, previewImage);
+            }
+            vidPreview.src = currentVideoBase64;
+            vidPreview.style.display = 'block';
+
+            imagePreviewOverlay.style.display = 'flex';
+        };
+        reader.readAsDataURL(file);
+    } else {
+        // Generic File / Document (PDF, ZIP, DOCX, APK, RAW, etc.) with preserved original name
+        const fileIconSVG = `
+            <div class="icon-btn" style="width: 80px; height: 80px; margin-bottom: 10px;">
+                <svg viewBox="0 0 24 24" style="--paper: #f0f0f0; --icon-color: #ccc;">
+                    <path d="M7 2.8h7l4.2 4.2V20a1.6 1.6 0 0 1-1.6 1.6H7.8A1.6 1.6 0 0 1 6.2 20V4.4A1.6 1.6 0 0 1 7.8 2.8z"
+                    fill="var(--paper)" stroke="var(--icon-color)" stroke-width="1.5"/>
+                    <path d="M14 2.8V8h4.2" fill="none"
+                    stroke="var(--icon-color)" stroke-width="1.5"/>
+                    <line x1="9" y1="12" x2="15" y2="12"
+                    stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
+                    <line x1="9" y1="15" x2="15" y2="15"
+                    stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
+                    <line x1="9" y1="18" x2="13.5" y2="18"
+                    stroke="var(--icon-color)" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+            </div>`;
+
+        const showFilePreview = () => {
+            currentImageBase64 = null;
+            currentVideoBase64 = null;
+            previewImage.style.display = 'none';
+            cropBtn.style.display = 'none';
+            filterBtn.style.display = 'none';
+            retakeBtn.style.display = 'flex';
+            sendImageBtn.style.display = 'flex';
+
+            const vidPreview = document.getElementById('previewVideo');
+            if (vidPreview) vidPreview.style.display = 'none';
+
+            let info = document.getElementById('file-preview-info');
+            if (!info) {
+                info = document.createElement('div');
+                info.id = 'file-preview-info';
+                info.style.color = 'white';
+                info.style.textAlign = 'center';
+                const container = previewImage.parentNode;
+                if (container) {
+                    container.insertBefore(info, previewImage);
+                }
+            }
+            info.style.display = 'block';
+            info.innerHTML = `${fileIconSVG}<h3 style="word-break: break-all; max-width: 80vw; margin-top: 10px;">${file.name}</h3><p>${(file.size / 1024 / 1024).toFixed(2)} MB</p>`;
+            imagePreviewOverlay.style.display = 'flex';
+        };
+
+        if (file.size <= CHUNK_SIZE) {
+            // Small file <= 5MB
+            reader.onload = function (e) {
+                currentFileData = {
+                    name: file.name,
+                    type: file.type || 'application/octet-stream',
+                    data: e.target.result.substring(e.target.result.indexOf(',') + 1)
+                };
+                currentFileChunks = null;
+                showFilePreview();
+            };
+            reader.readAsDataURL(file);
+        } else {
+            // Large file > 5MB
+            showToast("Slicing large file...");
+            currentFileData = { name: file.name, type: file.type || 'application/octet-stream', isChunked: true };
+            currentFileChunks = [];
+            sliceAndEncode(file, CHUNK_SIZE, showFilePreview);
+        }
+    }
     event.target.value = '';
 }
 
@@ -6654,8 +6952,9 @@ async function downloadAndCombineChunks(fileInfo, onBlobReady) {
     }
 }
 
-chatFileInput.addEventListener('change', handleFileSelect);
-chatCameraInput.addEventListener('change', handleFileSelect);
+if (chatPhotoInput) chatPhotoInput.addEventListener('change', handlePhotoSelect);
+if (chatFileInput) chatFileInput.addEventListener('change', handleFileSelect);
+if (chatCameraInput) chatCameraInput.addEventListener('change', handlePhotoSelect);
 
 retakeBtn.addEventListener('click', () => {
     if (cropper) {
@@ -6683,8 +6982,10 @@ retakeBtn.addEventListener('click', () => {
     if (lastImageSource === 'camera') {
         cameraLiveOverlay.style.display = 'flex';
         startCameraStream();
+    } else if (lastImageSource === 'photo') {
+        if (chatPhotoInput) chatPhotoInput.click();
     } else if (lastImageSource === 'file') {
-        chatFileInput.click();
+        if (chatFileInput) chatFileInput.click();
     }
 });
 
@@ -7402,7 +7703,8 @@ confirmLogout.addEventListener('click', () => {
     const alphaDash = document.getElementById('alpha-dashboard');
     if (alphaDash) alphaDash.classList.remove('blur-content');
 
-    // Hide Main Content & Nav
+    // Hide Main Content & Nav & Scroll Button
+    if (typeof window.hideScrollToBottomBtn === 'function') window.hideScrollToBottomBtn();
     mainContent.style.display = 'none';
     mainContent.style.opacity = '0';
     mainContent.style.transform = 'translateY(20px)';
@@ -9372,6 +9674,7 @@ function initAlphaUI() {
         `;
 
         btn.onclick = () => {
+            if (typeof window.hideScrollToBottomBtn === 'function') window.hideScrollToBottomBtn();
             navItems.forEach(n => {
                 n.view.style.display = 'none';
                 n.btn.style.color = 'gray';
@@ -9511,10 +9814,11 @@ function showAlphaHomeScreen() {
 
     const dashboard = document.getElementById('alpha-dashboard');
 
-    // Hide Chat UI
+    // Hide Chat UI & Scroll Button
     if (chatMessages) chatMessages.style.display = 'none';
     if (chatInputBar) chatInputBar.style.display = 'none';
     if (pinnedMessageBar) pinnedMessageBar.style.display = 'none';
+    if (typeof window.hideScrollToBottomBtn === 'function') window.hideScrollToBottomBtn();
 
     dashboard.style.display = 'flex';
     if (headerLogoutBtn) headerLogoutBtn.style.display = 'none';
@@ -9830,6 +10134,8 @@ function renderAlphaFriendList() {
 function openAlphaChat(friendId, friendName) {
     const dashboard = document.getElementById('alpha-dashboard');
     if (dashboard) dashboard.style.display = 'none';
+
+    if (typeof window.hideScrollToBottomBtn === 'function') window.hideScrollToBottomBtn();
 
     if (chatMessages) chatMessages.style.display = 'block';
     if (chatInputBar) chatInputBar.style.display = 'flex';
