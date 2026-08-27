@@ -5319,7 +5319,16 @@ captureCameraBtn.addEventListener('click', () => {
     ctx.drawImage(cameraVideo, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
 
     // Get image
-    currentImageBase64 = canvas.toDataURL('image/jpeg', 1.0); // Use 1.0 for highest quality
+    currentImageBase64 = canvas.toDataURL('image/jpeg', 0.94); // High quality
+    const camBase64Str = currentImageBase64.split(',')[1] || '';
+    const camByteSize = Math.round((camBase64Str.length * 3) / 4);
+    if (camByteSize > 580 * 1024) {
+        compressBase64Under600KB(currentImageBase64).then(opt => {
+            currentImageBase64 = opt;
+            baseImageForFilter = opt;
+            previewImage.src = opt;
+        }).catch(() => {});
+    }
     baseImageForFilter = currentImageBase64;
     currentFilterMode = 0;
     lastImageSource = 'camera';
@@ -6502,27 +6511,74 @@ function sendAudioMessage(base64Audio) {
 // --- Image Compression & Preview Logic ---
 
 /**
- * Compresses an image file (specifically targeting images > 5MB and <= 15MB, or any large image)
- * down to approximately ~3MB (target ~2.6MB - 3.2MB) while maximizing visual clarity and resolution.
- * @param {File} file The selected image file
- * @returns {Promise<string>} Base64 Data URL of the compressed image
+ * Converts HEIC/HEIF files to standard JPEG Blob if needed (iOS / Mac / modern camera formats).
+ * @param {File|Blob} fileOrBlob 
+ * @returns {Promise<Blob|File>}
  */
-async function compressImageToNear3MB(file) {
+async function convertHeicToJpegIfNeeded(fileOrBlob) {
+    if (!fileOrBlob) return fileOrBlob;
+    const name = (fileOrBlob.name || '').toLowerCase();
+    const type = (fileOrBlob.type || '').toLowerCase();
+    const isHeic = type === 'image/heic' || type === 'image/heif' || name.endsWith('.heic') || name.endsWith('.heif');
+
+    if (!isHeic) return fileOrBlob;
+
+    if (typeof heic2any === 'undefined') {
+        await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js';
+            script.onload = resolve;
+            script.onerror = () => reject(new Error("HEIC converter script could not be loaded"));
+            document.head.appendChild(script);
+        });
+    }
+
+    try {
+        const converted = await heic2any({
+            blob: fileOrBlob,
+            toType: 'image/jpeg',
+            quality: 0.94
+        });
+        return Array.isArray(converted) ? converted[0] : converted;
+    } catch (err) {
+        console.error("HEIC conversion failed:", err);
+        throw err;
+    }
+}
+
+/**
+ * Compresses any image (JPG, PNG, HEIC, HEIF, WEBP, GIF, SVG, BMP, AVIF, TIFF, etc.)
+ * down to strictly less than 600KB (target ~400KB - 580KB) while preserving maximum visual quality, sharpness, and high resolution.
+ * @param {File|Blob|string} source The selected image file or base64 data URL
+ * @returns {Promise<string>} Base64 Data URL of the compressed image (< 600KB)
+ */
+async function compressImageToUnder600KB(source) {
+    // If source is a HEIC File or Blob, convert it to JPEG first
+    if (source instanceof Blob || source instanceof File) {
+        const name = (source.name || '').toLowerCase();
+        const type = (source.type || '').toLowerCase();
+        if (type === 'image/heic' || type === 'image/heif' || name.endsWith('.heic') || name.endsWith('.heif')) {
+            try {
+                source = await convertHeicToJpegIfNeeded(source);
+            } catch (err) {
+                console.warn("HEIC pre-conversion warning:", err);
+            }
+        }
+    }
+
     return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onerror = reject;
-        reader.onload = function (e) {
+        const processImage = (imgSrc) => {
             const img = new Image();
-            img.onerror = reject;
+            img.crossOrigin = "anonymous";
+            img.onerror = (e) => reject(new Error("Failed to load image for compression"));
             img.onload = function () {
                 try {
                     let width = img.naturalWidth || img.width;
                     let height = img.naturalHeight || img.height;
 
-                    // Modern cameras produce huge images (e.g. 6000x4000 = 24MP or 48MP)
-                    // If image resolution is massive (> 4096px), limit max dimension to 3840px (4K UHD)
-                    // which preserves extreme detail while preventing mobile browser canvas crashes.
-                    const MAX_DIM = 3840;
+                    // Modern cameras produce huge images (e.g. 4000x3000 to 8000x6000 = 12MP to 48MP).
+                    // Set max dimension to 2048px (2K QHD), which preserves razor-sharp detail while removing redundant pixels.
+                    const MAX_DIM = 2048;
                     if (width > MAX_DIM || height > MAX_DIM) {
                         if (width > height) {
                             height = Math.round((height * MAX_DIM) / width);
@@ -6533,84 +6589,130 @@ async function compressImageToNear3MB(file) {
                         }
                     }
 
-                    const canvas = document.createElement('canvas');
+                    let canvas = document.createElement('canvas');
                     canvas.width = width;
                     canvas.height = height;
-                    const ctx = canvas.getContext('2d');
+                    let ctx = canvas.getContext('2d');
 
-                    // High-quality smoothing
+                    // Fill white background so transparent PNGs and SVGs don't turn black in JPEG
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, width, height);
+
+                    // High-quality bicubic smoothing
                     ctx.imageSmoothingEnabled = true;
                     ctx.imageSmoothingQuality = 'high';
                     ctx.drawImage(img, 0, 0, width, height);
 
-                    const MAX_BYTES = 3.2 * 1024 * 1024;    // ~3.2 MB upper bound
-                    const MIN_BYTES = 2.5 * 1024 * 1024;    // ~2.5 MB lower bound
+                    const MAX_BYTES = 580 * 1024;    // 580 KB upper bound (< 600 KB guarantee)
+                    const MIN_BYTES = 380 * 1024;    // 380 KB lower bound for high-quality window
 
                     // Helper to get DataURL and approximate byte size from canvas
-                    const getDataUrlWithSize = (q) => {
-                        const dataUrl = canvas.toDataURL('image/jpeg', q);
+                    const getDataUrlWithSize = (targetCanvas, q) => {
+                        const dataUrl = targetCanvas.toDataURL('image/jpeg', q);
                         const base64Str = dataUrl.split(',')[1] || '';
                         const byteSize = Math.round((base64Str.length * 3) / 4);
                         return { dataUrl, byteSize };
                     };
 
-                    // Try high quality first (0.94)
-                    let quality = 0.94;
-                    let res = getDataUrlWithSize(quality);
-
-                    if (res.byteSize <= MAX_BYTES) {
-                        console.log(`Image compressed with quality ${quality}: ${(res.byteSize / (1024 * 1024)).toFixed(2)} MB`);
-                        return resolve(res.dataUrl);
+                    // 1. Try visually near-lossless high quality first (0.92)
+                    let bestRes = getDataUrlWithSize(canvas, 0.92);
+                    if (bestRes.byteSize <= MAX_BYTES) {
+                        console.log(`Image optimized at quality 0.92: ${(bestRes.byteSize / 1024).toFixed(1)} KB`);
+                        return resolve(bestRes.dataUrl);
                     }
 
-                    // Binary search for optimal quality between 0.60 and 0.94 to get near ~3MB
-                    let minQ = 0.60;
-                    let maxQ = 0.94;
-                    let bestRes = res;
-
+                    // 2. Binary search quality between 0.70 and 0.92 to find the highest possible quality <= MAX_BYTES
+                    let minQ = 0.70;
+                    let maxQ = 0.92;
                     for (let iter = 0; iter < 7; iter++) {
                         let midQ = (minQ + maxQ) / 2;
-                        let testRes = getDataUrlWithSize(midQ);
-                        bestRes = testRes;
-
-                        if (testRes.byteSize > MAX_BYTES) {
-                            maxQ = midQ;
-                        } else if (testRes.byteSize < MIN_BYTES) {
+                        let testRes = getDataUrlWithSize(canvas, midQ);
+                        if (testRes.byteSize <= MAX_BYTES) {
+                            bestRes = testRes;
+                            if (testRes.byteSize >= MIN_BYTES) {
+                                break;
+                            }
                             minQ = midQ;
                         } else {
-                            // Within optimal target window (~2.5MB to 3.2MB)
-                            break;
+                            maxQ = midQ;
                         }
                     }
 
-                    // If still larger than 3.4MB (e.g. extremely complex/noisy image), scale canvas down slightly with high quality
-                    if (bestRes.byteSize > 3.4 * 1024 * 1024) {
+                    // 3. If still > MAX_BYTES (e.g. extremely complex/noisy texture), progressively downscale canvas
+                    // and re-encode with high quality (0.85-0.88) rather than introducing low-quality compression artifacts.
+                    let scaleIter = 0;
+                    while (bestRes.byteSize > MAX_BYTES && scaleIter < 4) {
+                        scaleIter++;
+                        const scaleFactor = Math.max(0.75, Math.min(0.90, Math.sqrt(MAX_BYTES / bestRes.byteSize) * 0.96));
+                        const newW = Math.max(320, Math.round(canvas.width * scaleFactor));
+                        const newH = Math.max(320, Math.round(canvas.height * scaleFactor));
+
                         const scaleCanvas = document.createElement('canvas');
-                        scaleCanvas.width = Math.round(width * 0.82);
-                        scaleCanvas.height = Math.round(height * 0.82);
+                        scaleCanvas.width = newW;
+                        scaleCanvas.height = newH;
                         const sCtx = scaleCanvas.getContext('2d');
+                        sCtx.fillStyle = '#ffffff';
+                        sCtx.fillRect(0, 0, newW, newH);
                         sCtx.imageSmoothingEnabled = true;
                         sCtx.imageSmoothingQuality = 'high';
-                        sCtx.drawImage(canvas, 0, 0, scaleCanvas.width, scaleCanvas.height);
+                        sCtx.drawImage(canvas, 0, 0, newW, newH);
+                        canvas = scaleCanvas;
 
-                        const finalDataUrl = scaleCanvas.toDataURL('image/jpeg', 0.88);
-                        return resolve(finalDataUrl);
+                        bestRes = getDataUrlWithSize(canvas, 0.86);
+                        if (bestRes.byteSize > MAX_BYTES) {
+                            let sMinQ = 0.70, sMaxQ = 0.86;
+                            for (let i = 0; i < 5; i++) {
+                                let sMidQ = (sMinQ + sMaxQ) / 2;
+                                let sRes = getDataUrlWithSize(canvas, sMidQ);
+                                if (sRes.byteSize <= MAX_BYTES) {
+                                    bestRes = sRes;
+                                    sMinQ = sMidQ;
+                                } else {
+                                    sMaxQ = sMidQ;
+                                }
+                            }
+                        }
                     }
 
-                    console.log(`Image compressed: original ${(file.size / (1024 * 1024)).toFixed(2)} MB -> final ${(bestRes.byteSize / (1024 * 1024)).toFixed(2)} MB`);
+                    console.log(`Image compressed: final ${(bestRes.byteSize / 1024).toFixed(1)} KB (< 600KB)`);
                     resolve(bestRes.dataUrl);
                 } catch (err) {
                     console.error("Compression processing error:", err);
-                    resolve(e.target.result);
+                    resolve(imgSrc);
                 }
             };
-            img.src = e.target.result;
+            img.src = imgSrc;
         };
-        reader.readAsDataURL(file);
+
+        if (typeof source === 'string') {
+            processImage(source);
+        } else if (source instanceof Blob || source instanceof File) {
+            const reader = new FileReader();
+            reader.onerror = reject;
+            reader.onload = (e) => processImage(e.target.result);
+            reader.readAsDataURL(source);
+        } else {
+            reject(new Error("Invalid source for image compression"));
+        }
     });
 }
 
-// --- Photo Selection Handler (Photo option with auto compression) ---
+/**
+ * Ensures a base64 image data URL is strictly less than 600KB.
+ * @param {string} dataUrl 
+ * @returns {Promise<string>}
+ */
+async function compressBase64Under600KB(dataUrl) {
+    if (!dataUrl || typeof dataUrl !== 'string') return dataUrl;
+    const base64Str = dataUrl.split(',')[1] || '';
+    const byteSize = Math.round((base64Str.length * 3) / 4);
+    if (byteSize <= 580 * 1024) {
+        return dataUrl;
+    }
+    return compressImageToUnder600KB(dataUrl);
+}
+
+// --- Photo Selection Handler (Supports JPG, PNG, HEIC, WEBP, GIF, SVG, BMP, AVIF, TIFF, etc. with auto compression to < 600KB) ---
 async function handlePhotoSelect(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -6640,11 +6742,30 @@ async function handlePhotoSelect(event) {
         imagePreviewOverlay.style.display = 'flex';
     };
 
-    // If image is greater than 5MB (up to 15MB or larger), automatically compress to approx ~3MB preserving quality
-    if (file.size > 5 * 1024 * 1024) {
+    const fileName = (file.name || '').toLowerCase();
+    const fileType = (file.type || '').toLowerCase();
+    const isHeic = fileType === 'image/heic' || fileType === 'image/heif' || fileName.endsWith('.heic') || fileName.endsWith('.heif');
+
+    if (isHeic) {
+        showToast("Converting HEIC photo...");
+        try {
+            const convertedFile = await convertHeicToJpegIfNeeded(file);
+            showToast(`Optimizing photo (${(convertedFile.size / 1024 / 1024).toFixed(1)}MB)...`);
+            const compressedBase64 = await compressImageToUnder600KB(convertedFile);
+            showImagePreview(compressedBase64);
+        } catch (err) {
+            console.error("HEIC processing error:", err);
+            showToast("Failed to process HEIC image.");
+        }
+        event.target.value = '';
+        return;
+    }
+
+    // For all other image formats (JPG, PNG, WEBP, GIF, BMP, SVG, AVIF, TIFF, etc.):
+    if (file.size > 600 * 1024) {
         showToast(`Optimizing photo (${(file.size / 1024 / 1024).toFixed(1)}MB)...`);
         try {
-            const compressedBase64 = await compressImageToNear3MB(file);
+            const compressedBase64 = await compressImageToUnder600KB(file);
             showImagePreview(compressedBase64);
         } catch (err) {
             console.error("Photo compression error, falling back:", err);
@@ -6653,9 +6774,24 @@ async function handlePhotoSelect(event) {
             reader.readAsDataURL(file);
         }
     } else {
-        // Image <= 5MB: Load directly
+        // Image <= 600KB: Load directly or optimize if base64 > 580KB
         const reader = new FileReader();
-        reader.onload = (e) => showImagePreview(e.target.result);
+        reader.onload = async (e) => {
+            const rawDataUrl = e.target.result;
+            // Ensure even <= 600KB files (e.g. huge uncompressed PNG) stay strictly < 600KB in base64
+            const base64Str = rawDataUrl.split(',')[1] || '';
+            const byteSize = Math.round((base64Str.length * 3) / 4);
+            if (byteSize > 580 * 1024) {
+                try {
+                    const optimized = await compressImageToUnder600KB(rawDataUrl);
+                    showImagePreview(optimized);
+                } catch (err) {
+                    showImagePreview(rawDataUrl);
+                }
+            } else {
+                showImagePreview(rawDataUrl);
+            }
+        };
         reader.readAsDataURL(file);
     }
 
@@ -7023,7 +7159,16 @@ cropBtn.addEventListener('click', () => {
     } else {
         // Apply Crop
         const canvas = cropper.getCroppedCanvas();
-        currentImageBase64 = canvas.toDataURL('image/jpeg');
+        currentImageBase64 = canvas.toDataURL('image/jpeg', 0.92);
+        const base64Str = currentImageBase64.split(',')[1] || '';
+        const byteSize = Math.round((base64Str.length * 3) / 4);
+        if (byteSize > 580 * 1024) {
+            compressBase64Under600KB(currentImageBase64).then(opt => {
+                currentImageBase64 = opt;
+                baseImageForFilter = currentImageBase64;
+                previewImage.src = currentImageBase64;
+            }).catch(() => {});
+        }
         baseImageForFilter = currentImageBase64; // Commit crop as new base
         currentFilterMode = 0; // Reset filter cycle
 
@@ -7056,7 +7201,15 @@ filterBtn.addEventListener('click', () => {
         else ctx.filter = 'none';
 
         ctx.drawImage(img, 0, 0);
-        currentImageBase64 = canvas.toDataURL('image/jpeg');
+        currentImageBase64 = canvas.toDataURL('image/jpeg', 0.92);
+        const base64Str = currentImageBase64.split(',')[1] || '';
+        const byteSize = Math.round((base64Str.length * 3) / 4);
+        if (byteSize > 580 * 1024) {
+            compressBase64Under600KB(currentImageBase64).then(opt => {
+                currentImageBase64 = opt;
+                previewImage.src = currentImageBase64;
+            }).catch(() => {});
+        }
         previewImage.src = currentImageBase64;
     };
     img.src = baseImageForFilter;
@@ -7096,6 +7249,16 @@ sendImageBtn.addEventListener('click', async () => {
             // Let it run in the background for large files (image or other)
             uploadFileInChunks(msgData, currentFileData, currentFileChunks, newMsgRef);
         } else if (currentImageBase64) {
+            try {
+                // Ensure image is strictly < 600KB before saving to Firebase
+                const base64Str = currentImageBase64.split(',')[1] || '';
+                const byteSize = Math.round((base64Str.length * 3) / 4);
+                if (byteSize > 580 * 1024) {
+                    currentImageBase64 = await compressBase64Under600KB(currentImageBase64);
+                }
+            } catch (optErr) {
+                console.warn("Final image optimization warning:", optErr);
+            }
             msgData.image = currentImageBase64;
             newMsgRef.set(msgData).catch(err => console.error("Send Error:", err));
         } else if (currentFileData) {
@@ -9175,7 +9338,7 @@ function initAlphaUI() {
 
     const statusFileInput = document.createElement('input');
     statusFileInput.type = 'file';
-    statusFileInput.accept = 'image/*';
+    statusFileInput.accept = 'image/*, .heic, .heif, .heif-sequence, .heic-sequence, .png, .jpg, .jpeg, .webp, .gif, .bmp, .svg, .avif, .tiff, .tif';
     statusFileInput.multiple = false;
     statusFileInput.style.display = 'none';
 

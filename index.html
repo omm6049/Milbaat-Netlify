@@ -1225,7 +1225,7 @@
             <div id="profileUsernameDisplay" style="color: #00d2ff; font-size: 1.2rem; font-weight: bold; margin-bottom: 5px;">User</div>
             <div style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-bottom: 20px;">Administrator</div>
             
-            <input type="file" id="profileFileInput" accept="image/*" style="display: none;">
+            <input type="file" id="profileFileInput" accept="image/*, .heic, .heif, .heif-sequence, .heic-sequence, .png, .jpg, .jpeg, .webp, .gif, .bmp, .svg, .avif, .tiff, .tif" style="display: none;">
             <button class="modal-btn" style="background: rgba(255,255,255,0.15); color: white; margin-bottom: 10px;" id="uploadTriggerBtn">📸 Change Picture</button>
             <button class="modal-btn confirm-btn" id="closeProfileBtn">Close</button>
         </div>
@@ -1590,8 +1590,8 @@
             <button class="action-btn" id="micBtn">🎤</button>
         </div>
         <input type="file" id="chatFileInput" style="display: none;">
-        <input type="file" id="chatPhotoInput" accept="image/*" style="display: none;">
-        <input type="file" id="chatCameraInput" accept="image/*" capture="environment" style="display: none;">
+        <input type="file" id="chatPhotoInput" accept="image/*, .heic, .heif, .heif-sequence, .heic-sequence, .png, .jpg, .jpeg, .webp, .gif, .bmp, .svg, .avif, .tiff, .tif" style="display: none;">
+        <input type="file" id="chatCameraInput" accept="image/*, .heic, .heif, .heif-sequence, .heic-sequence, .png, .jpg, .jpeg, .webp, .gif, .bmp, .svg, .avif, .tiff, .tif" capture="environment" style="display: none;">
         <input type="text" class="chat-input" placeholder="Type a message..." id="msgInput" autocomplete="off" name="chatbox" data-lpignore="true" data-form-type="other">
         <button class="send-btn" id="sendMsgBtn">➤</button>
     </div>
@@ -1599,6 +1599,7 @@
     <!-- Toast Notification -->
     <div id="toast-notification">Notification</div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
