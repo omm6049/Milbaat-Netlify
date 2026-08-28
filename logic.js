@@ -334,11 +334,11 @@ window.updateHeaderProfilePic = function () {
         // Style: Fixed bottom, full width, glassmorphism with a cool dark slate tint
         // Note: display is set to 'none' initially, toggled to 'flex' on login
         chatInputBar.style.cssText = `
-            position: absolute; bottom: 0; left: 0; width: 100%; height: 60px; 
-            display: none; align-items: center; justify-content: space-between; padding: 5px 8px;
-            background: rgba(25, 30, 35, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            border-top: 3px solid rgba(255, 255, 255, 0.08); z-index: 1000; box-sizing: border-box;
-            box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.2); color: white; gap: 5px; touch-action: none;
+            position: absolute; bottom: 0; left: 0; width: 100%; height: auto; min-height: 56px;
+            display: none; align-items: flex-end; justify-content: space-between; padding: 6px 8px;
+            background: rgba(11, 20, 26, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border-top: 1px solid rgba(255, 255, 255, 0.08); z-index: 1000; box-sizing: border-box;
+            box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.2); color: white; gap: 6px; touch-action: none;
         `;
 
         // --- Input Box Layout Restructuring ---
@@ -346,12 +346,20 @@ window.updateHeaderProfilePic = function () {
         if (!inputWrapper) {
             inputWrapper = document.createElement('div');
             inputWrapper.id = 'input-box-wrapper';
-
-            // Style the wrapper (The "Box")
+            inputWrapper.className = 'input-box-wrapper';
             inputWrapper.style.cssText = `
-                display: flex; align-items: center; flex: 1;
-                background: rgba(255, 255, 255, 0.1); border-radius: 25px;
-                padding: 5px 8px; position: relative; min-width: 0;
+                display: flex; flex-direction: column; flex: 1; min-width: 0;
+                background: #1f2c34; border-radius: 24px;
+                padding: 3px 6px; position: relative; box-sizing: border-box;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+            `;
+
+            // Inner Input Row
+            const inputInnerRow = document.createElement('div');
+            inputInnerRow.id = 'input-inner-row';
+            inputInnerRow.className = 'input-inner-row';
+            inputInnerRow.style.cssText = `
+                display: flex; align-items: center; width: 100%; min-width: 0; padding: 2px 2px; box-sizing: border-box;
             `;
 
             // Style Input Field
@@ -359,25 +367,30 @@ window.updateHeaderProfilePic = function () {
                 // Emoji Button
                 const emojiBtn = document.createElement('button');
                 emojiBtn.id = 'emojiBtn';
-                emojiBtn.innerHTML = '<svg viewBox="0 0 24 24" style="width: 26px; height: 26px;"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="10" r="1.2" fill="currentColor"/><circle cx="15" cy="10" r="1.2" fill="currentColor"/><path d="M8.5 14c1.2 1.5 5.8 1.5 7 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
-                emojiBtn.style.cssText = 'background: transparent; border: none; padding: 0 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: rgba(255, 255, 255, 0.7); transition: transform 0.2s;';
+                emojiBtn.setAttribute('type', 'button');
+                emojiBtn.setAttribute('title', 'Emoji');
+                emojiBtn.innerHTML = '<svg viewBox="0 0 24 24" style="width: 24px; height: 24px;"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="10" r="1.2" fill="currentColor"/><circle cx="15" cy="10" r="1.2" fill="currentColor"/><path d="M8.5 14c1.2 1.5 5.8 1.5 7 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+                emojiBtn.style.cssText = 'background: transparent; border: none; padding: 0 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: rgba(255, 255, 255, 0.65); transition: transform 0.2s, color 0.2s; flex-shrink: 0;';
                 emojiBtn.addEventListener('mouseenter', () => {
                     emojiBtn.style.transform = 'scale(1.1)';
+                    emojiBtn.style.color = 'rgba(255, 255, 255, 0.9)';
                 });
                 emojiBtn.addEventListener('mouseleave', () => {
                     emojiBtn.style.transform = 'scale(1)';
+                    emojiBtn.style.color = 'rgba(255, 255, 255, 0.65)';
                 });
 
-                inputWrapper.appendChild(emojiBtn);
+                inputInnerRow.appendChild(emojiBtn);
 
                 msgInput.style.background = 'transparent';
                 msgInput.style.border = 'none';
                 msgInput.style.color = 'white';
                 msgInput.style.flex = '1';
-                msgInput.style.padding = '8px';
+                msgInput.style.padding = '8px 6px';
                 msgInput.style.outline = 'none';
-                msgInput.placeholder = "Type a Message...";
-                inputWrapper.appendChild(msgInput);
+                msgInput.style.fontSize = '15px';
+                msgInput.placeholder = "Message";
+                inputInnerRow.appendChild(msgInput);
 
                 // Emoji Picker Container
                 const emojiPicker = document.createElement('div');
@@ -421,29 +434,68 @@ window.updateHeaderProfilePic = function () {
                 });
             }
 
-            // Style & Move Attach/Camera Icons inside wrapper
+            // Style & Move Attach/Camera Icons inside inner row
             if (attachBtn) {
-                attachBtn.innerHTML = '<svg viewBox="0 0 24 24" style="width: 24px; height: 24px;"><path fill="currentColor" d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5a4 4 0 0 0-8 0v12.5c0 3.03 2.47 5.5 5.5 5.5s5.5-2.47 5.5-5.5V6h-1.5z"/></svg>';
+                attachBtn.innerHTML = '<svg viewBox="0 0 24 24" style="width: 22px; height: 22px;"><path fill="currentColor" d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5a2.5 2.5 0 0 0 5 0V5a4 4 0 0 0-8 0v12.5c0 3.03 2.47 5.5 5.5 5.5s5.5-2.47 5.5-5.5V6h-1.5z"/></svg>';
             }
             if (cameraBtn) {
-                cameraBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px;"><path d="M20 5h-3.2l-1.8-2H9L7.2 5H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>';
+                cameraBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 22px; height: 22px;"><path d="M20 5h-3.2l-1.8-2H9L7.2 5H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>';
             }
 
             [attachBtn, cameraBtn].forEach(btn => {
                 if (btn) {
                     btn.style.background = 'transparent';
                     btn.style.border = 'none';
-                    btn.style.padding = '8px';
+                    btn.style.padding = '6px';
                     btn.style.cursor = 'pointer';
-                    btn.style.color = 'rgba(255, 255, 255, 0.7)';
+                    btn.style.color = 'rgba(255, 255, 255, 0.65)';
                     btn.style.display = 'flex';
                     btn.style.alignItems = 'center';
                     btn.style.justifyContent = 'center';
-                    inputWrapper.appendChild(btn);
+                    btn.style.flexShrink = '0';
+                    inputInnerRow.appendChild(btn);
                 }
             });
 
+            // Insert Reply Preview inside inputWrapper at top
+            if (replyPreview) {
+                let accentBar = replyPreview.querySelector('.reply-bar-accent');
+                if (!accentBar) {
+                    accentBar = document.createElement('div');
+                    accentBar.className = 'reply-bar-accent';
+                    replyPreview.prepend(accentBar);
+                }
+
+                let thumbContainer = replyPreview.querySelector('.reply-thumb-container');
+                if (!thumbContainer) {
+                    thumbContainer = document.createElement('div');
+                    thumbContainer.className = 'reply-thumb-container';
+                    thumbContainer.id = 'replyThumbContainer';
+                    thumbContainer.style.display = 'none';
+
+                    const thumbImg = document.createElement('img');
+                    thumbImg.className = 'reply-thumbnail';
+                    thumbImg.id = 'replyThumbnail';
+                    thumbImg.alt = 'Thumbnail';
+                    thumbContainer.appendChild(thumbImg);
+
+                    if (cancelReplyBtn) {
+                        replyPreview.insertBefore(thumbContainer, cancelReplyBtn);
+                    } else {
+                        replyPreview.appendChild(thumbContainer);
+                    }
+                }
+
+                if (cancelReplyBtn) {
+                    cancelReplyBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+                }
+
+                inputWrapper.appendChild(replyPreview);
+            }
+
+            inputWrapper.appendChild(inputInnerRow);
             chatInputBar.prepend(inputWrapper);
+
             if (attachmentDropup && !chatInputBar.contains(attachmentDropup)) {
                 chatInputBar.appendChild(attachmentDropup);
             }
@@ -451,42 +503,21 @@ window.updateHeaderProfilePic = function () {
             // Style Mic & Send Buttons (Inside Shared Circle)
             const actionContainer = document.createElement('div');
             actionContainer.id = 'mic-send-action-container';
-            actionContainer.style.cssText = 'width: 45px; height: 45px; border-radius: 50%; background: #10eb5c; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.2);';
+            actionContainer.style.cssText = 'width: 48px; height: 48px; border-radius: 50%; background: #00a884; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.3);';
 
-            const btnStyle = `width: 100%; height: 100%; background: transparent !important; border: none !important; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; color: black !important; box-shadow: none !important;`;
+            const btnStyle = `width: 100%; height: 100%; background: transparent !important; border: none !important; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; color: #000000 !important; box-shadow: none !important;`;
 
             if (micBtn) {
                 micBtn.style.cssText = btnStyle;
-                micBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 22px; height: 22px;"><path d="M12 15a3.5 3.5 0 0 0 3.5-3.5V7.5A3.5 3.5 0 0 0 12 4a3.5 3.5 0 0 0-3.5 3.5v4A3.5 3.5 0 0 0 12 15z"/><path d="M18 11.5a6 6 0 0 1-12 0h-2a8 8 0 0 0 7 7.9V22h2v-2.6a8 8 0 0 0 7-7.9z"/></svg>';
+                micBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px;"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>';
                 actionContainer.appendChild(micBtn);
             }
             if (sendMsgBtn) {
                 sendMsgBtn.style.cssText = btnStyle + ' display: none;';
-                sendMsgBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px; margin-left: 2px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
+                sendMsgBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 22px; height: 22px; margin-left: 2px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
                 actionContainer.appendChild(sendMsgBtn);
             }
             chatInputBar.appendChild(actionContainer);
-        }
-
-        // Fix: Move Reply Preview inside Footer to eliminate gap
-        if (replyPreview) {
-            chatInputBar.appendChild(replyPreview);
-            replyPreview.style.cssText = `
-                position: absolute; 
-                bottom: 100%; 
-                left: 0; 
-                width: 100%; 
-                display: none; 
-                background: rgba(20, 20, 30, 0.95);
-                backdrop-filter: blur(10px);
-                padding: 10px 15px;
-                border-top: 1px solid rgba(255, 255, 255, 0.1);
-                justify-content: space-between;
-                align-items: center;
-                z-index: 998;
-                border-left: 4px solid #00d2ff;
-                box-sizing: border-box;
-            `;
         }
 
         // --- Main Chat Cointainer ka design jisme sab message show ho rha hai ---
@@ -2346,22 +2377,65 @@ function addSwipeHandler(element, msg) {
 function startReply(msg) {
     replyToMsg = msg;
     replyPreview.style.display = 'flex';
-    replySender.innerText = msg.sender === currentUser ? 'You' : msg.sender;
+    
+    const isSent = (msg.sender === currentUser);
+    if (isSent) {
+        replyPreview.classList.add('reply-sent');
+        replyPreview.classList.remove('reply-received');
+        replySender.innerText = 'You';
+    } else {
+        replyPreview.classList.add('reply-received');
+        replyPreview.classList.remove('reply-sent');
+        replySender.innerText = msg.sender;
+    }
 
-    const imageSvg = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 5px; margin-bottom: 2px;"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>';
-    const videoSvg = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 5px; margin-bottom: 2px;"><path d="M17 10.5V7c0-1.1-.9-2-2-2H5C3.9 5 3 5.9 3 7v10c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-3.5l4 4v-11l-4 4z"/></svg>';
-    const audioSvg = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 5px; margin-bottom: 2px;"><path d="M6.6 10.8c1.6 3.1 3.5 5 6.6 6.6l2.2-2.2c.3-.3.8-.4 1.2-.3 1 .3 2 .4 3 .4.7 0 1.2.5 1.2 1.2V21c0 .7-.5 1.2-1.2 1.2C10.4 22.2 1.8 13.6 1.8 3.2 1.8 2.5 2.3 2 3 2h4.5c.7 0 1.2.5 1.2 1.2 0 1 .1 2 .4 3 .1.4 0 .9-.3 1.2l-2.2 2.4z"/></svg>';
-    const fileSvg = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 5px; margin-bottom: 2px;"><path d="M6 2c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6H6zm7 7V3.5L18.5 9H13z"/></svg>';
+    const photoSvg = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 15px; height: 15px; vertical-align: middle; margin-right: 4px; margin-bottom: 2px; opacity: 0.85;"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>';
+    const videoSvg = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 4px; margin-bottom: 2px; opacity: 0.85;"><path d="M17 10.5V7c0-1.1-.9-2-2-2H5C3.9 5 3 5.9 3 7v10c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-3.5l4 4v-11l-4 4z"/></svg>';
+    const audioSvg = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 16px; height: 16px; vertical-align: middle; margin-right: 4px; margin-bottom: 2px; opacity: 0.85;"><path d="M6.6 10.8c1.6 3.1 3.5 5 6.6 6.6l2.2-2.2c.3-.3.8-.4 1.2-.3 1 .3 2 .4 3 .4.7 0 1.2.5 1.2 1.2V21c0 .7-.5 1.2-1.2 1.2C10.4 22.2 1.8 13.6 1.8 3.2 1.8 2.5 2.3 2 3 2h4.5c.7 0 1.2.5 1.2 1.2 0 1 .1 2 .4 3 .1.4 0 .9-.3 1.2l-2.2 2.4z"/></svg>';
+    const fileSvg = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 15px; height: 15px; vertical-align: middle; margin-right: 4px; margin-bottom: 2px; opacity: 0.85;"><path d="M6 2c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6H6zm7 7V3.5L18.5 9H13z"/></svg>';
+
+    const replyThumbContainer = document.getElementById('replyThumbContainer');
+    const replyThumbnail = document.getElementById('replyThumbnail');
+
+    let isImage = !!msg.image;
+    let isVideo = !!msg.video;
+
+    if (isImage || isVideo) {
+        replyPreview.classList.add('has-thumbnail');
+        if (replyThumbContainer) replyThumbContainer.style.display = 'block';
+
+        if (isImage) {
+            if (typeof msg.image === 'object' && msg.image.isChunked) {
+                if (replyThumbnail) {
+                    replyThumbnail.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+                    downloadAndCombineChunks(msg.image, (blob) => {
+                        replyThumbnail.src = URL.createObjectURL(blob);
+                    });
+                }
+            } else if (replyThumbnail) {
+                replyThumbnail.src = msg.image.startsWith('data:') ? msg.image : `data:image/jpeg;base64,${msg.image}`;
+            }
+        } else if (isVideo && replyThumbnail) {
+            replyThumbnail.src = msg.video;
+        }
+    } else {
+        replyPreview.classList.remove('has-thumbnail');
+        if (replyThumbContainer) replyThumbContainer.style.display = 'none';
+        if (replyThumbnail) replyThumbnail.src = '';
+    }
 
     let displayText = msg.text;
     let isMissedCall = false;
 
-    if (!displayText) {
-        if (msg.image) displayText = imageSvg + ' Image';
-        else if (msg.video) displayText = videoSvg + ' Video';
-        else if (msg.audio) displayText = audioSvg + ' Audio';
-        else if (msg.file) displayText = fileSvg + ' File';
-    } else {
+    if (msg.image) {
+        displayText = photoSvg + ' ' + (msg.text ? msg.text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : 'Photo');
+    } else if (msg.video) {
+        displayText = videoSvg + ' ' + (msg.text ? msg.text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : 'Video');
+    } else if (msg.audio) {
+        displayText = audioSvg + ' Audio';
+    } else if (msg.file) {
+        displayText = fileSvg + ' ' + (msg.file.name || 'File');
+    } else if (displayText) {
         displayText = displayText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         if (displayText.includes("Missed Video Call") || displayText.includes("Missed Audio Call")) {
             isMissedCall = true;
@@ -2371,7 +2445,10 @@ function startReply(msg) {
         if (isMissedCall) {
             displayText = `<span style="color: #ff4757; font-weight: bold;">${displayText}</span>`;
         }
+    } else {
+        displayText = 'Message';
     }
+
     replyText.innerHTML = displayText;
     msgInput.focus();
 }
@@ -2826,9 +2903,15 @@ function renderChat(history, oldHistoryLength = 0) {
         // Render Reply Context if exists
         if (msg.replyTo) {
             const replyDiv = document.createElement('div');
-            replyDiv.className = 'replied-msg-context';
+            const isSentReply = (msg.replyTo.sender === currentUser);
+            replyDiv.className = `replied-msg-context ${isSentReply ? 'reply-sent' : 'reply-received'}`;
 
-            let repliedTextContent = msg.replyTo.text;
+            const origMsg = currentChatHistory.find(m => m.id === msg.replyTo.id);
+            const targetImage = msg.replyTo.image || (origMsg && origMsg.image);
+            const targetVideo = msg.replyTo.video || (origMsg && origMsg.video);
+            const hasMedia = !!(targetImage || targetVideo || msg.replyTo.hasImage || msg.replyTo.hasVideo);
+
+            let repliedTextContent = msg.replyTo.text || '';
             let isMissedCall = false;
 
             repliedTextContent = repliedTextContent.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -2836,20 +2919,62 @@ function renderChat(history, oldHistoryLength = 0) {
                 isMissedCall = true;
             }
 
-            const videoSvgText = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 3px; margin-bottom: 2px;"><path d="M17 10.5V7c0-1.1-.9-2-2-2H5C3.9 5 3 5.9 3 7v10c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-3.5l4 4v-11l-4 4z"/></svg>';
-            const audioSvgText = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 3px; margin-bottom: 2px;"><path d="M6.6 10.8c1.6 3.1 3.5 5 6.6 6.6l2.2-2.2c.3-.3.8-.4 1.2-.3 1 .3 2 .4 3 .4.7 0 1.2.5 1.2 1.2V21c0 .7-.5 1.2-1.2 1.2C10.4 22.2 1.8 13.6 1.8 3.2 1.8 2.5 2.3 2 3 2h4.5c.7 0 1.2.5 1.2 1.2 0 1 .1 2 .4 3 .1.4 0 .9-.3 1.2l-2.2 2.4z"/></svg>';
-            const imageSvgText = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 3px; margin-bottom: 2px;"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>';
-            const fileSvgText = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 3px; margin-bottom: 2px;"><path d="M6 2c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6H6zm7 7V3.5L18.5 9H13z"/></svg>';
+            const videoSvgText = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px; margin-bottom: 2px; opacity: 0.85;"><path d="M17 10.5V7c0-1.1-.9-2-2-2H5C3.9 5 3 5.9 3 7v10c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-3.5l4 4v-11l-4 4z"/></svg>';
+            const audioSvgText = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px; margin-bottom: 2px; opacity: 0.85;"><path d="M6.6 10.8c1.6 3.1 3.5 5 6.6 6.6l2.2-2.2c.3-.3.8-.4 1.2-.3 1 .3 2 .4 3 .4.7 0 1.2.5 1.2 1.2V21c0 .7-.5 1.2-1.2 1.2C10.4 22.2 1.8 13.6 1.8 3.2 1.8 2.5 2.3 2 3 2h4.5c.7 0 1.2.5 1.2 1.2 0 1 .1 2 .4 3 .1.4 0 .9-.3 1.2l-2.2 2.4z"/></svg>';
+            const photoSvgText = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px; margin-bottom: 2px; opacity: 0.85;"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>';
+            const fileSvgText = '<svg viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px; margin-bottom: 2px; opacity: 0.85;"><path d="M6 2c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6H6zm7 7V3.5L18.5 9H13z"/></svg>';
 
-            repliedTextContent = repliedTextContent.replace('📹', videoSvgText).replace('📞', audioSvgText).replace('📷', imageSvgText).replace('📄', fileSvgText);
+            if (targetImage || msg.replyTo.hasImage) {
+                if (!repliedTextContent || repliedTextContent === 'Photo' || repliedTextContent === 'Image' || repliedTextContent === 'Message') {
+                    repliedTextContent = photoSvgText + ' Photo';
+                } else if (!repliedTextContent.includes('<svg') && !repliedTextContent.includes('📷')) {
+                    repliedTextContent = photoSvgText + ' ' + repliedTextContent;
+                }
+            } else if (targetVideo || msg.replyTo.hasVideo) {
+                if (!repliedTextContent || repliedTextContent === 'Video' || repliedTextContent === 'Message') {
+                    repliedTextContent = videoSvgText + ' Video';
+                } else if (!repliedTextContent.includes('<svg') && !repliedTextContent.includes('🎥')) {
+                    repliedTextContent = videoSvgText + ' ' + repliedTextContent;
+                }
+            }
+
+            repliedTextContent = repliedTextContent.replace('📹', videoSvgText).replace('🎥', videoSvgText).replace('📞', audioSvgText).replace('📷', photoSvgText).replace('📄', fileSvgText);
             if (isMissedCall) {
                 repliedTextContent = `<span style="color: #ff4757; font-weight: bold;">${repliedTextContent}</span>`;
             }
 
+            const senderDisplayName = isSentReply ? 'You' : msg.replyTo.sender;
+
+            let thumbHtml = '';
+            if (hasMedia) {
+                thumbHtml = `<div class="replied-thumb"><img class="replied-img-thumb" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="thumb"></div>`;
+            }
+
             replyDiv.innerHTML = `
-                <span class="replied-sender">${msg.replyTo.sender === currentUser ? 'You' : msg.replyTo.sender}</span>
-                <span class="replied-text">${repliedTextContent}</span>
+                <div class="replied-accent-bar"></div>
+                <div class="replied-info">
+                    <span class="replied-sender">${senderDisplayName}</span>
+                    <span class="replied-text">${repliedTextContent}</span>
+                </div>
+                ${thumbHtml}
             `;
+
+            if (hasMedia) {
+                const imgThumb = replyDiv.querySelector('.replied-img-thumb');
+                if (imgThumb) {
+                    if (targetImage) {
+                        if (typeof targetImage === 'object' && targetImage.isChunked) {
+                            downloadAndCombineChunks(targetImage, (blob) => {
+                                imgThumb.src = URL.createObjectURL(blob);
+                            });
+                        } else if (typeof targetImage === 'string' && targetImage.length > 50) {
+                            imgThumb.src = targetImage.startsWith('data:') ? targetImage : `data:image/jpeg;base64,${targetImage}`;
+                        }
+                    } else if (targetVideo && typeof targetVideo === 'string') {
+                        imgThumb.src = targetVideo;
+                    }
+                }
+            }
 
             replyDiv.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -3974,6 +4099,26 @@ if (refreshChatBtn) {
     });
 }
 
+// Click other user's name / info in chat header to refresh chat status
+if (logoDisplay) {
+    logoDisplay.style.cursor = 'pointer';
+    logoDisplay.title = 'Click to refresh chat';
+    logoDisplay.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await performManualRefresh();
+    });
+}
+
+const headerUserInfo = document.getElementById('headerUserInfo');
+if (headerUserInfo) {
+    headerUserInfo.style.cursor = 'pointer';
+    headerUserInfo.title = 'Click to refresh chat';
+    headerUserInfo.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await performManualRefresh();
+    });
+}
+
 // --- Clear Chat Logic ---
 clearChatBtn.addEventListener('click', () => {
     menuOptions.style.display = 'none';
@@ -4452,6 +4597,11 @@ cancelDeleteMsg.addEventListener('click', () => {
 cancelReplyBtn.addEventListener('click', () => {
     replyToMsg = null;
     replyPreview.style.display = 'none';
+    replyPreview.classList.remove('reply-sent', 'reply-received', 'has-thumbnail');
+    const thumbContainer = document.getElementById('replyThumbContainer');
+    const replyThumbnail = document.getElementById('replyThumbnail');
+    if (thumbContainer) thumbContainer.style.display = 'none';
+    if (replyThumbnail) replyThumbnail.src = '';
 });
 
 // --- Change Password Logic ---
@@ -5089,12 +5239,32 @@ sendMsgBtn.addEventListener('click', () => {
             status: 'sent', // Initial status
             // Add reply info
             replyTo: replyToMsg ? (() => {
-                const rText = replyToMsg.text || (replyToMsg.image ? '📷 Image' : (replyToMsg.video ? '🎥 Video' : (replyToMsg.audio ? '🎤 Audio' : (replyToMsg.file ? '📄 File' : 'Message'))));
-                return {
+                let rText = replyToMsg.text;
+                if (!rText) {
+                    if (replyToMsg.image) rText = 'Photo';
+                    else if (replyToMsg.video) rText = 'Video';
+                    else if (replyToMsg.audio) rText = 'Audio';
+                    else if (replyToMsg.file) rText = (replyToMsg.file && replyToMsg.file.name) ? replyToMsg.file.name : 'File';
+                    else rText = 'Message';
+                }
+                const replyObj = {
                     id: replyToMsg.id,
                     sender: replyToMsg.sender,
                     text: rText
                 };
+                if (replyToMsg.image) {
+                    if (typeof replyToMsg.image === 'string' && replyToMsg.image.length < 80000) {
+                        replyObj.image = replyToMsg.image;
+                    } else if (typeof replyToMsg.image === 'object') {
+                        replyObj.image = replyToMsg.image;
+                    } else {
+                        replyObj.hasImage = true;
+                    }
+                }
+                if (replyToMsg.video) {
+                    replyObj.hasVideo = true;
+                }
+                return replyObj;
             })() : null
         };
         newMsgRef.set(newMsg).catch(error => {
@@ -5106,6 +5276,11 @@ sendMsgBtn.addEventListener('click', () => {
         // Clear reply state
         replyToMsg = null;
         replyPreview.style.display = 'none';
+        replyPreview.classList.remove('reply-sent', 'reply-received', 'has-thumbnail');
+        const thumbContainer = document.getElementById('replyThumbContainer');
+        const replyThumbnail = document.getElementById('replyThumbnail');
+        if (thumbContainer) thumbContainer.style.display = 'none';
+        if (replyThumbnail) replyThumbnail.src = '';
         msgInput.value = '';
 
         // Reset Mic/Send State
