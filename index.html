@@ -692,6 +692,14 @@
         }
         .chat-input::placeholder { color: rgba(255,255,255,0.5); }
 
+        #input-box-wrapper {
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        #input-box-wrapper:focus-within {
+            border-color: rgba(0, 210, 255, 0.4) !important;
+            box-shadow: 0 0 8px rgba(0, 210, 255, 0.25) !important;
+        }
+
         .send-btn {
             background: linear-gradient(90deg, #00d2ff, #3a7bd5);
             border: none;
@@ -1013,6 +1021,25 @@
                 opacity: 1;
                 transform: translateY(0);
             }
+        }
+
+        @keyframes replyPulse {
+            0% { transform: scale(1); filter: brightness(1); }
+            40% { transform: scale(1.03); filter: brightness(1.25); box-shadow: 0 0 15px rgba(0, 210, 255, 0.4); }
+            100% { transform: scale(1); filter: brightness(1); box-shadow: none; }
+        }
+
+        .msg-reply-pulse {
+            animation: replyPulse 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        .msg-highlight {
+            animation: highlightGlow 1.5s ease-out;
+        }
+
+        @keyframes highlightGlow {
+            0% { background-color: rgba(0, 210, 255, 0.45); }
+            100% { background-color: transparent; }
         }
 
         .reply-bar-accent {

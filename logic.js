@@ -2374,6 +2374,108 @@ function addSwipeHandler(element, msg) {
     });
 }
 
+// Helper to automatically focus, activate, and position cursor in input bar
+function activateChatInput() {
+    if (!msgInput) return;
+    try {
+        msgInput.focus();
+        const len = msgInput.value ? msgInput.value.length : 0;
+        msgInput.setSelectionRange(len, len);
+    } catch (err) {}
+
+    requestAnimationFrame(() => {
+        if (!msgInput) return;
+        try {
+            msgInput.focus();
+            const len = msgInput.value ? msgInput.value.length : 0;
+            msgInput.setSelectionRange(len, len);
+        } catch (err) {}
+    });
+
+    setTimeout(() => {
+        if (!msgInput) return;
+        try {
+            msgInput.focus();
+            const len = msgInput.value ? msgInput.value.length : 0;
+            msgInput.setSelectionRange(len, len);
+        } catch (err) {}
+    }, 50);
+}
+
+// Helper for Double Tap & Double Click to Reply
+function addDoubleTapHandler(element, msg) {
+    let lastTapTime = 0;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let hasMoved = false;
+
+    // Mobile / Touchscreen Double Tap Handler
+    element.addEventListener('touchstart', (e) => {
+        if (e.touches && e.touches.length === 1) {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            hasMoved = false;
+        }
+    }, { passive: true });
+
+    element.addEventListener('touchmove', (e) => {
+        if (e.touches && e.touches.length === 1) {
+            const moveX = Math.abs(e.touches[0].clientX - touchStartX);
+            const moveY = Math.abs(e.touches[0].clientY - touchStartY);
+            if (moveX > 15 || moveY > 15) {
+                hasMoved = true;
+            }
+        }
+    }, { passive: true });
+
+    element.addEventListener('touchend', (e) => {
+        if (hasMoved || isSelectionMode) {
+            lastTapTime = 0;
+            return;
+        }
+
+        const now = Date.now();
+        const tapGap = now - lastTapTime;
+
+        if (tapGap > 30 && tapGap < 350) {
+            // Double Tap Detected!
+            e.preventDefault();
+            lastTapTime = 0;
+            startReply(msg);
+            activateChatInput();
+            if (navigator.vibrate) navigator.vibrate(30);
+
+            // Visual feedback on message
+            element.classList.remove('msg-reply-pulse');
+            void element.offsetWidth;
+            element.classList.add('msg-reply-pulse');
+            setTimeout(() => element.classList.remove('msg-reply-pulse'), 600);
+        } else {
+            lastTapTime = now;
+        }
+    });
+
+    // Desktop Mouse Double Click Handler
+    element.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (isSelectionMode) {
+            toggleSelection(msg.id);
+        } else {
+            startReply(msg);
+            activateChatInput();
+            if (navigator.vibrate) navigator.vibrate(30);
+
+            // Visual feedback on message
+            element.classList.remove('msg-reply-pulse');
+            void element.offsetWidth;
+            element.classList.add('msg-reply-pulse');
+            setTimeout(() => element.classList.remove('msg-reply-pulse'), 600);
+        }
+    });
+}
+
 function startReply(msg) {
     replyToMsg = msg;
     replyPreview.style.display = 'flex';
@@ -2450,7 +2552,7 @@ function startReply(msg) {
     }
 
     replyText.innerHTML = displayText;
-    msgInput.focus();
+    activateChatInput();
 }
 
 function getMessageTable(sender) {
@@ -3216,20 +3318,14 @@ function renderChat(history, oldHistoryLength = 0) {
         if (msg.id) {
             addLongPressHandler(msgDiv, msg.id);
             addSwipeHandler(msgDiv, msg);
+            addDoubleTapHandler(msgDiv, msg);
         }
 
-        // Selection Click Handlers
+        // Selection Click Handlers (Single click during selection mode toggles selection)
         msgDiv.addEventListener('click', (e) => {
             if (isSelectionMode) {
                 e.preventDefault();
                 e.stopPropagation();
-                toggleSelection(msg.id);
-            }
-        });
-        msgDiv.addEventListener('dblclick', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!isSelectionMode) {
                 toggleSelection(msg.id);
             }
         });
