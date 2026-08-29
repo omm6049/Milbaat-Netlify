@@ -395,36 +395,17 @@ window.updateHeaderProfilePic = function () {
                 // Emoji Picker Container
                 const emojiPicker = document.createElement('div');
                 emojiPicker.id = 'emoji-picker';
-                emojiPicker.style.cssText = `
-                    position: absolute; bottom: 100%; left: 10px; margin-bottom: 10px;
-                    width: 300px; max-width: 80vw; height: 250px; overflow-y: auto;
-                    background: rgba(30, 30, 40, 0.95); backdrop-filter: blur(10px);
-                    border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px;
-                    display: none; grid-template-columns: repeat(auto-fill, minmax(35px, 1fr));
-                    padding: 10px; gap: 5px; z-index: 2000; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-                `;
-
-                const emojis = ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🤩", "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬", "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗", "🤔", "🤭", "🤫", "🤥", "😶", "😐", "😑", "😬", "🙄", "😯", "😦", "😧", "😮", "😲", "🥱", "😴", "🤤", "😪", "😵", "🤐", "🥴", "🤢", "🤮", "🤧", "😷", "🤒", "🤕", "🤑", "🤠", "😈", "👿", "👹", "👺", "🤡", "💩", "👻", "💀", "☠️", "👽", "👾", "🤖", "🎃", "😺", "😸", "😹", "😻", "😼", "😽", "🙀", "😿", "😾", "👋", "🤚", "🖐", "✋", "🖖", "👌", "🤏", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", "🖕", "👇", "☝️", "👍", "👎", "✊", "👊", "🤛", "🤜", "👏", "🙌", "👐", "🤲", "🤝", "🙏", "💪", "🧠", "🦴", "👀", "👁", "👄", "💋", "🦷", "👅", "👂", "🦻", "👃", "🦵", "🦶", "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟", "☮️", "✝️", "☪️", "🕉", "☸️", "✡️", "🔯", "🕎", "☯️", "☦️", "🛐", "⛎", "♈️", "♉️", "♊️", "♋️", "♌️", "♍️", "♎️", "♏️", "♐️", "♑️", "♒️", "♓️", "🆔", "⚛️", "🉑", "☢️", "☣️", "📴", "📳", "🈶", "🈚️", "🈸", "🈺", "🈷️", "✴️", "🆚", "💮", "🉐", "㊙️", "㊗️", "🈴", "🈵", "🈹", "🈲", "🅰️", "🅱️", "🆎", "🆑", "🅾️", "🆘", "❌", "⭕️", "🛑", "⛔️", "📛", "🚫", "💯", "💢", "♨️", "🚷", "🚯", "🚳", "🚱", "🔞", "📵", "🚭", "❗️", "❕", "❓", "❔", "‼️", "⁉️", "🔅", "🔆", "〽️", "⚠️", "🚸", "🔱", "⚜️", "🔰", "♻️", "✅", "🈯️", "💹", "❇️", "✳️", "❎", "🌐", "🍆", "🍑", "🍓", "🍒", "🥑", "🍔", "🍕", "🍖", "🍗", "🌭", "🥪", "🌮", "🌯", "🥙", "🥚", "🍳", "🥘", "🍲", "🥣", "🥗", "🍿", "🧈", "🧂", "🥫", "🍱", "🍘", "🍙", "🍚", "🍛", "🍜", "🍝", "🍠", "🍢", "🍣", "🍤", "🍥", "🥮", "🍡", "🥟", "🥠", "🥡", "🦀", "🦞", "🦐", "🦑", "🦪", "🍦", "🍧", "🍨", "🍩", "🍪", "🎂", "🍰", "🧁", "🥧", "🍫", "🍬", "🍭", "🍮", "🍯", "🍼", "🥛", "☕️", "🍵", "🍶", "🍾", "🍷", "🍸", "🍹", "🍺", "🍻", "🥂", "🥃", "🥤", "🧃", "🧉", "🧊", "🥢", "🍽", "🍴", "🥄", "🔪", "🏺"];
-
-                emojis.forEach(emoji => {
-                    const span = document.createElement('span');
-                    span.innerText = emoji;
-                    span.style.cssText = 'cursor: pointer; font-size: 1.5rem; padding: 5px; text-align: center; user-select: none; transition: transform 0.1s;';
-                    span.onmouseover = () => span.style.transform = 'scale(1.2)';
-                    span.onmouseout = () => span.style.transform = 'scale(1)';
-                    span.onclick = () => {
-                        msgInput.value += emoji;
-                        msgInput.focus();
-                        msgInput.dispatchEvent(new Event('input'));
-                    };
-                    emojiPicker.appendChild(span);
-                });
-
+                setupEmojiPicker(emojiPicker, msgInput);
                 chatInputBar.appendChild(emojiPicker);
+
+                // Enable device keyboard GIF & sticker capture
+                setupKeyboardGifCapture();
 
                 emojiBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    emojiPicker.style.display = emojiPicker.style.display === 'grid' ? 'none' : 'grid';
+                    const isVisible = emojiPicker.style.display === 'grid';
+                    emojiPicker.style.display = isVisible ? 'none' : 'grid';
+                    if (attachmentDropup) attachmentDropup.style.display = 'none';
                 });
 
                 document.addEventListener('click', (e) => {
@@ -491,6 +472,12 @@ window.updateHeaderProfilePic = function () {
                 }
 
                 inputWrapper.appendChild(replyPreview);
+            }
+
+            // Insert GIF Preview inside inputWrapper
+            const gifPreviewEl = document.getElementById('gifPreview');
+            if (gifPreviewEl) {
+                inputWrapper.appendChild(gifPreviewEl);
             }
 
             inputWrapper.appendChild(inputInnerRow);
@@ -2374,6 +2361,274 @@ function addSwipeHandler(element, msg) {
     });
 }
 
+// --- Ultra-Fast GIF Staging and Device Keyboard Integration ---
+let stagedGif = null;
+let activeBlobUrl = null;
+let lastGifStageTime = 0;
+
+function stageGif(gifUrl, sublabel = "GIF", fallbackBase64Promise = null) {
+    if (!gifUrl) return;
+    const now = Date.now();
+    stagedGif = gifUrl;
+    lastGifStageTime = now;
+
+    const gifPreview = document.getElementById('gifPreview');
+    const gifThumbnail = document.getElementById('gifThumbnail');
+    const gifSublabel = document.getElementById('gifSublabel');
+
+    if (gifThumbnail) {
+        gifThumbnail.src = gifUrl;
+    }
+    if (gifSublabel) {
+        gifSublabel.innerText = sublabel || "GIF";
+    }
+    if (gifPreview) {
+        gifPreview.style.display = 'flex';
+    }
+
+    // Close emoji picker if open
+    const emojiPicker = document.getElementById('emoji-picker');
+    if (emojiPicker) emojiPicker.style.display = 'none';
+
+    // Instantly activate input and place cursor at end
+    if (msgInput) {
+        try {
+            msgInput.focus();
+            const len = msgInput.value ? msgInput.value.length : 0;
+            msgInput.setSelectionRange(len, len);
+        } catch (e) {}
+    }
+
+    // Instantly toggle Send button
+    if (micBtn) micBtn.style.display = 'none';
+    if (sendMsgBtn) sendMsgBtn.style.display = 'flex';
+    if (cameraBtn) cameraBtn.style.display = 'none';
+
+    // If a background promise for Base64 conversion was provided, update stagedGif when ready
+    if (fallbackBase64Promise && typeof fallbackBase64Promise.then === 'function') {
+        fallbackBase64Promise.then((base64) => {
+            if (stagedGif && lastGifStageTime === now) {
+                stagedGif = base64;
+            }
+        }).catch(err => console.error("Base64 GIF conversion error:", err));
+    }
+}
+
+function unstageGif() {
+    stagedGif = null;
+    if (activeBlobUrl) {
+        try { URL.revokeObjectURL(activeBlobUrl); } catch (e) {}
+        activeBlobUrl = null;
+    }
+    const gifPreview = document.getElementById('gifPreview');
+    const gifThumbnail = document.getElementById('gifThumbnail');
+    if (gifPreview) gifPreview.style.display = 'none';
+    if (gifThumbnail) gifThumbnail.src = '';
+
+    // Update send/mic button
+    const text = msgInput ? msgInput.value.trim() : '';
+    if (text.length > 0) {
+        if (micBtn) micBtn.style.display = 'none';
+        if (sendMsgBtn) sendMsgBtn.style.display = 'flex';
+        if (cameraBtn) cameraBtn.style.display = 'none';
+    } else {
+        if (micBtn) micBtn.style.display = 'flex';
+        if (sendMsgBtn) sendMsgBtn.style.display = 'none';
+        if (cameraBtn) cameraBtn.style.display = 'inline-block';
+    }
+}
+
+// Helper to construct Clean Emoji Picker
+function setupEmojiPicker(emojiPicker, msgInput) {
+    emojiPicker.innerHTML = '';
+    emojiPicker.style.cssText = `
+        position: absolute; bottom: 100%; left: 10px; margin-bottom: 10px;
+        width: 300px; max-width: 82vw; height: 260px; overflow-y: auto;
+        background: rgba(22, 28, 36, 0.96); backdrop-filter: blur(14px);
+        border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 14px;
+        display: none; grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+        padding: 10px; gap: 5px; z-index: 2000; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    `;
+
+    const emojis = ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🤩", "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬", "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗", "🤔", "🤭", "🤫", "🤥", "😶", "😐", "😑", "😬", "🙄", "😯", "😦", "😧", "😮", "😲", "🥱", "😴", "🤤", "😪", "😵", "🤐", "🥴", "🤢", "🤮", "🤧", "😷", "🤒", "🤕", "🤑", "🤠", "😈", "👿", "👹", "👺", "🤡", "💩", "👻", "💀", "☠️", "👽", "👾", "🤖", "🎃", "😺", "😸", "😹", "😻", "😼", "😽", "🙀", "😿", "😾", "👋", "🤚", "🖐", "✋", "🖖", "👌", "🤏", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", "🖕", "👇", "☝️", "👍", "👎", "✊", "👊", "🤛", "🤜", "👏", "🙌", "👐", "🤲", "🤝", "🙏", "💪", "🧠", "🦴", "👀", "👁", "👄", "💋", "🦷", "👅", "👂", "🦻", "👃", "🦵", "🦶", "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟", "☮️", "✝️", "☪️", "🕉", "☸️", "✡️", "🔯", "🕎", "☯️", "☦️", "🛐", "⛎", "♈️", "♉️", "♊️", "♋️", "♌️", "♍️", "♎️", "♏️", "♐️", "♑️", "♒️", "♓️", "🆔", "⚛️", "🉑", "☢️", "☣️", "📴", "📳", "🈶", "🈚️", "🈸", "🈺", "🈷️", "✴️", "🆚", "💮", "🉐", "㊙️", "㊗️", "🈴", "🈵", "🈹", "🈲", "🅰️", "🅱️", "🆎", "🆑", "🅾️", "🆘", "❌", "⭕️", "🛑", "⛔️", "📛", "🚫", "💯", "💢", "♨️", "🚷", "🚯", "🚳", "🚱", "🔞", "📵", "🚭", "❗️", "❕", "❓", "❔", "‼️", "⁉️", "🔅", "🔆", "〽️", "⚠️", "🚸", "🔱", "⚜️", "🔰", "♻️", "✅", "🈯️", "💹", "❇️", "✳️", "❎", "🌐", "🍆", "🍑", "🍓", "🍒", "🥑", "🍔", "🍕", "🍖", "🍗", "🌭", "🥪", "🌮", "🌯", "🥙", "🥚", "🍳", "🥘", "🍲", "🥣", "🥗", "🍿", "🧈", "🧂", "🥫", "🍱", "🍘", "🍙", "🍚", "🍛", "🍜", "🍝", "🍠", "🍢", "🍣", "🍤", "🍥", "🥮", "🍡", "🥟", "🥠", "🥡", "🦀", "🦞", "🦐", "🦑", "🦪", "🍦", "🍧", "🍨", "🍩", "🍪", "🎂", "🍰", "🧁", "🥧", "🍫", "🍬", "🍭", "🍮", "🍯", "🍼", "🥛", "☕️", "🍵", "🍶", "🍾", "🍷", "🍸", "🍹", "🍺", "🍻", "🥂", "🥃", "🥤", "🧃", "🧉", "🧊", "🥢", "🍽", "🍴", "🥄", "🔪", "🏺"];
+
+    emojis.forEach(emoji => {
+        const span = document.createElement('span');
+        span.innerText = emoji;
+        span.style.cssText = 'cursor: pointer; font-size: 1.45rem; padding: 4px; text-align: center; user-select: none; transition: transform 0.1s; display: flex; align-items: center; justify-content: center;';
+        span.onmouseover = () => span.style.transform = 'scale(1.25)';
+        span.onmouseout = () => span.style.transform = 'scale(1)';
+        span.onclick = () => {
+            msgInput.value += emoji;
+            activateChatInput();
+            msgInput.dispatchEvent(new Event('input'));
+        };
+        emojiPicker.appendChild(span);
+    });
+}
+
+// --- Ultra-Fast, Multi-Engine Device Keyboard & Windows (Win + .) GIF Capture ---
+function setupKeyboardGifCapture() {
+    let lastProcessedTime = 0;
+
+    function processClipboardOrDataTransfer(dataTransferOrClipboard, event) {
+        if (!dataTransferOrClipboard) return false;
+
+        const now = Date.now();
+        // Prevent duplicate processing from rapid beforeinput + paste cascades (< 150ms)
+        if (now - lastProcessedTime < 150) {
+            if (event && event.preventDefault) event.preventDefault();
+            return true;
+        }
+
+        // 1. Instant Check: text/html (Windows Win + . emoji/GIF picker pastes HTML <img> tags)
+        const htmlText = dataTransferOrClipboard.getData ? dataTransferOrClipboard.getData('text/html') : null;
+        if (htmlText && typeof htmlText === 'string') {
+            // Fast regex test first
+            const imgMatch = htmlText.match(/<img[^>]+src=["']([^"']+)["']/i);
+            if (imgMatch && imgMatch[1]) {
+                if (event && event.preventDefault) event.preventDefault();
+                lastProcessedTime = now;
+                stageGif(imgMatch[1], "GIF");
+                return true;
+            }
+            try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlText, 'text/html');
+                const img = doc.querySelector('img');
+                if (img && img.src && (img.src.startsWith('http://') || img.src.startsWith('https://') || img.src.startsWith('data:image/'))) {
+                    if (event && event.preventDefault) event.preventDefault();
+                    lastProcessedTime = now;
+                    stageGif(img.src, "GIF");
+                    return true;
+                }
+            } catch (err) {}
+        }
+
+        // 2. Instant Check: Binary image files & items (Android Gboard / iOS keyboard / native clipboard)
+        const items = dataTransferOrClipboard.items;
+        if (items && items.length > 0) {
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.type && (item.type.startsWith('image/') || item.kind === 'file')) {
+                    const file = item.getAsFile ? item.getAsFile() : null;
+                    if (file && file.type && file.type.startsWith('image/')) {
+                        if (event && event.preventDefault) event.preventDefault();
+                        lastProcessedTime = now;
+
+                        // Instant zero-lag preview using ObjectURL
+                        if (activeBlobUrl) {
+                            try { URL.revokeObjectURL(activeBlobUrl); } catch (e) {}
+                        }
+                        activeBlobUrl = URL.createObjectURL(file);
+
+                        // Read Base64 asynchronously in background for persistent sending
+                        const base64Promise = new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = (evt) => resolve(evt.target.result);
+                            reader.onerror = () => resolve(activeBlobUrl);
+                            reader.readAsDataURL(file);
+                        });
+
+                        stageGif(activeBlobUrl, "GIF", base64Promise);
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // 3. Direct File list
+        const files = dataTransferOrClipboard.files;
+        if (files && files.length > 0) {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (file.type && file.type.startsWith('image/')) {
+                    if (event && event.preventDefault) event.preventDefault();
+                    lastProcessedTime = now;
+
+                    if (activeBlobUrl) {
+                        try { URL.revokeObjectURL(activeBlobUrl); } catch (e) {}
+                    }
+                    activeBlobUrl = URL.createObjectURL(file);
+
+                    const base64Promise = new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (evt) => resolve(evt.target.result);
+                        reader.onerror = () => resolve(activeBlobUrl);
+                        reader.readAsDataURL(file);
+                    });
+
+                    stageGif(activeBlobUrl, "GIF", base64Promise);
+                    return true;
+                }
+            }
+        }
+
+        // 4. Check plain text (direct Tenor, Giphy, or image/gif URLs)
+        const pastedText = dataTransferOrClipboard.getData ? dataTransferOrClipboard.getData('text/plain') : null;
+        if (pastedText && typeof pastedText === 'string') {
+            const trimmed = pastedText.trim();
+            if (trimmed.startsWith('data:image/')) {
+                if (event && event.preventDefault) event.preventDefault();
+                lastProcessedTime = now;
+                stageGif(trimmed, "GIF");
+                return true;
+            }
+            if (trimmed.match(/^https?:\/\//i)) {
+                const isImageUrl = trimmed.match(/^https?:\/\/.*\.(gif|webp|png|jpg|jpeg|avif)(\?.*)?$/i);
+                const isGifProvider = (
+                    trimmed.includes('tenor.com') ||
+                    trimmed.includes('giphy.com') ||
+                    trimmed.includes('gfycat.com') ||
+                    trimmed.includes('imgur.com') ||
+                    trimmed.includes('media.tenor.com') ||
+                    trimmed.includes('c.tenor.com')
+                );
+                if (isImageUrl || isGifProvider) {
+                    if (event && event.preventDefault) event.preventDefault();
+                    lastProcessedTime = now;
+                    stageGif(trimmed, "GIF");
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    if (msgInput) {
+        // Capture paste on the input with high priority (capture phase)
+        msgInput.addEventListener('paste', (e) => {
+            const clipboardData = e.clipboardData || window.clipboardData;
+            processClipboardOrDataTransfer(clipboardData, e);
+        }, { capture: true });
+
+        // Capture beforeinput (handles rich content insertion from Gboard/iOS keyboard)
+        msgInput.addEventListener('beforeinput', (e) => {
+            if (e.dataTransfer) {
+                processClipboardOrDataTransfer(e.dataTransfer, e);
+            } else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertReplacementText') {
+                const clipboardData = window.clipboardData;
+                if (clipboardData) processClipboardOrDataTransfer(clipboardData, e);
+            }
+        }, { capture: true });
+
+        // Capture drop
+        msgInput.addEventListener('drop', (e) => {
+            if (e.dataTransfer) {
+                processClipboardOrDataTransfer(e.dataTransfer, e);
+            }
+        });
+    }
+
+    // Global window capture in case keyboard event bubbles to window/document
+    window.addEventListener('paste', (e) => {
+        if (!currentChatPartner || currentChatPartner === currentUser) return;
+        const clipboardData = e.clipboardData || window.clipboardData;
+        processClipboardOrDataTransfer(clipboardData, e);
+    }, { capture: true });
+}
+
 // Helper to automatically focus, activate, and position cursor in input bar
 function activateChatInput() {
     if (!msgInput) return;
@@ -2515,7 +2770,7 @@ function startReply(msg) {
                     });
                 }
             } else if (replyThumbnail) {
-                replyThumbnail.src = msg.image.startsWith('data:') ? msg.image : `data:image/jpeg;base64,${msg.image}`;
+                replyThumbnail.src = (typeof msg.image === 'string' && (msg.image.startsWith('data:') || msg.image.startsWith('http://') || msg.image.startsWith('https://') || msg.image.startsWith('blob:'))) ? msg.image : `data:image/jpeg;base64,${msg.image}`;
             }
         } else if (isVideo && replyThumbnail) {
             replyThumbnail.src = msg.video;
@@ -3109,7 +3364,7 @@ function renderChat(history, oldHistoryLength = 0) {
                     img.src = URL.createObjectURL(blob);
                 });
             } else {
-                img.src = msg.image.startsWith('data:') ? msg.image : `data:image/jpeg;base64,${msg.image}`;
+                img.src = (typeof msg.image === 'string' && (msg.image.startsWith('data:') || msg.image.startsWith('http://') || msg.image.startsWith('https://') || msg.image.startsWith('blob:'))) ? msg.image : `data:image/jpeg;base64,${msg.image}`;
             }
             img.className = 'msg-image';
             img.dataset.msgId = msg.id; // Added for viewer sync
@@ -5261,11 +5516,29 @@ if (msgInput) {
     });
 }
 
-// Typing detection
+// Typing detection & Send/Mic toggling + auto-detecting pasted GIF URLs
 msgInput.addEventListener('input', () => {
+    const rawVal = msgInput.value.trim();
+
+    // If a direct GIF / Tenor / Giphy URL was inserted as text by keyboard or paste
+    if (!stagedGif && rawVal.match(/^https?:\/\//i)) {
+        const isImageUrl = rawVal.match(/^https?:\/\/.*\.(gif|webp)(\?.*)?$/i);
+        const isGifProvider = (
+            rawVal.includes('media.tenor.com') ||
+            rawVal.includes('c.tenor.com') ||
+            rawVal.includes('tenor.com/view') ||
+            rawVal.includes('media.giphy.com') ||
+            rawVal.includes('giphy.com/gifs')
+        );
+        if (isImageUrl || isGifProvider) {
+            stageGif(rawVal, "GIF");
+            msgInput.value = ''; // Clean input for typing message
+        }
+    }
+
     const text = msgInput.value.trim();
-    // Toggle Mic / Send
-    if (text.length > 0) {
+    // Toggle Mic / Send (Keep Send visible if text is present OR a GIF is staged)
+    if (text.length > 0 || stagedGif) {
         if (micBtn) micBtn.style.display = 'none';
         if (sendMsgBtn) sendMsgBtn.style.display = 'flex';
         if (cameraBtn) cameraBtn.style.display = 'none';
@@ -5291,8 +5564,32 @@ msgInput.addEventListener('keydown', (e) => {
     }
 });
 
+// Cancel GIF button listener
+const cancelGifBtn = document.getElementById('cancelGifBtn');
+if (cancelGifBtn) {
+    cancelGifBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        unstageGif();
+    });
+}
+
+// Custom GIF file input handler
+const gifCustomFileInput = document.getElementById('gifCustomFileInput');
+if (gifCustomFileInput) {
+    gifCustomFileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            stageGif(evt.target.result, file.name || "Custom GIF");
+        };
+        reader.readAsDataURL(file);
+        e.target.value = '';
+    });
+}
+
 // --- Chat Functionality ---
-sendMsgBtn.addEventListener('click', () => {
+sendMsgBtn.addEventListener('click', async () => {
     if (currentChatPartner && blockedUsersSet.has(currentChatPartner)) {
         showUnblockPrompt();
         return;
@@ -5308,7 +5605,23 @@ sendMsgBtn.addEventListener('click', () => {
         return;
     }
 
-    if (text !== "") {
+    if (text !== "" || stagedGif) {
+        let finalImage = stagedGif;
+        if (stagedGif && stagedGif.startsWith('blob:')) {
+            try {
+                const resp = await fetch(stagedGif);
+                const blob = await resp.blob();
+                finalImage = await new Promise((res) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => res(e.target.result);
+                    reader.onerror = () => res(stagedGif);
+                    reader.readAsDataURL(blob);
+                });
+            } catch (e) {
+                console.error("Blob conversion error:", e);
+            }
+        }
+
         const now = new Date();
         // Format: DD/MM HH:MM AM/PM
         const d = String(now.getDate()).padStart(2, '0');
@@ -5363,6 +5676,12 @@ sendMsgBtn.addEventListener('click', () => {
                 return replyObj;
             })() : null
         };
+
+        if (finalImage) {
+            newMsg.image = finalImage;
+            newMsg.isGif = true;
+        }
+
         newMsgRef.set(newMsg).catch(error => {
             console.error("Send Error:", error);
             alert("Failed to send message: " + error.message);
@@ -5377,6 +5696,10 @@ sendMsgBtn.addEventListener('click', () => {
         const replyThumbnail = document.getElementById('replyThumbnail');
         if (thumbContainer) thumbContainer.style.display = 'none';
         if (replyThumbnail) replyThumbnail.src = '';
+
+        // Clear staged GIF
+        unstageGif();
+
         msgInput.value = '';
 
         // Reset Mic/Send State
@@ -7016,6 +7339,17 @@ async function handlePhotoSelect(event) {
     const fileName = (file.name || '').toLowerCase();
     const fileType = (file.type || '').toLowerCase();
     const isHeic = fileType === 'image/heic' || fileType === 'image/heif' || fileName.endsWith('.heic') || fileName.endsWith('.heif');
+    const isGif = fileType === 'image/gif' || fileName.endsWith('.gif');
+
+    if (isGif) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            stageGif(e.target.result, file.name || "GIF");
+        };
+        reader.readAsDataURL(file);
+        event.target.value = '';
+        return;
+    }
 
     if (isHeic) {
         showToast("Converting HEIC photo...");
