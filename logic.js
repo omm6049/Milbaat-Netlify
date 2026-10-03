@@ -1446,6 +1446,224 @@ if (db) {
 }
 let serverTimeOffset = 0;
 
+// --- GPS Tracking System ---
+function getOrdinalSuffix(num) {
+    const j = num % 10, k = num % 100;
+    if (j === 1 && k !== 11) return num + "st";
+    if (j === 2 && k !== 12) return num + "nd";
+    if (j === 3 && k !== 13) return num + "rd";
+    return num + "th";
+}
+
+function formatFullDateTime(d = new Date()) {
+    const pad = (n) => String(n).padStart(2, '0');
+    const day = pad(d.getDate());
+    const month = pad(d.getMonth() + 1);
+    const year = d.getFullYear();
+    const dateFormatted = `${day}/${month}/${year}`;
+
+    let hours = d.getHours();
+    const minutes = pad(d.getMinutes());
+    const seconds = pad(d.getSeconds());
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const timeFormatted = `${pad(hours)}:${minutes}:${seconds} ${ampm}`;
+
+    const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const fullDate = `${daysOfWeek[d.getDay()]}, ${day} ${monthNames[d.getMonth()]} ${year}`;
+    const fullDateTime = `${fullDate}, ${timeFormatted}`;
+
+    return {
+        date: dateFormatted,
+        time: timeFormatted,
+        fullFormat: fullDateTime,
+        timestamp: d.getTime()
+    };
+}
+
+async function fetchIPLocationFallback() {
+    // 1. Primary IP Fallback (ipapi.co)
+    try {
+        const res = await fetch('https://ipapi.co/json/');
+        if (res.ok) {
+            const data = await res.json();
+            if (data.latitude && data.longitude) {
+                return {
+                    latitude: data.latitude,
+                    longitude: data.longitude,
+                    accuracy: null,
+                    source: "IP Geolocation"
+                };
+            }
+        }
+    } catch (e) {
+        console.warn("ipapi.co fallback failed:", e);
+    }
+
+    // 2. Secondary IP Fallback (ipwho.is)
+    try {
+        const res2 = await fetch('https://ipwho.is/');
+        if (res2.ok) {
+            const data2 = await res2.json();
+            if (data2.latitude && data2.longitude) {
+                return {
+                    latitude: data2.latitude,
+                    longitude: data2.longitude,
+                    accuracy: null,
+                    source: "IP Geolocation"
+                };
+            }
+        }
+    } catch (e) {
+        console.warn("ipwho.is fallback failed:", e);
+    }
+
+    return {
+        latitude: "Unavailable",
+        longitude: "Unavailable",
+        accuracy: null,
+        source: "Unavailable"
+    };
+}
+
+function getGPSLocation() {
+    return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+            console.warn("Geolocation API is not supported in this browser.");
+            fetchIPLocationFallback().then(resolve);
+            return;
+        }
+
+        const options = {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        };
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                resolve({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    accuracy: position.coords.accuracy || null,
+                    source: "GPS/Device"
+                });
+            },
+            (error) => {
+                console.warn("GPS Geolocation error:", error.message);
+                fetchIPLocationFallback().then(resolve);
+            },
+            options
+        );
+    });
+}
+
+async function getNearbyLocationName(lat, lon) {
+    if (!lat || !lon || lat === "Unavailable" || lon === "Unavailable") {
+        return "Location Unavailable";
+    }
+
+    // 1. Try BigDataCloud Client Reverse Geocode API
+    try {
+        const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`);
+        if (res.ok) {
+            const data = await res.json();
+            const parts = [];
+            if (data.locality) parts.push(data.locality);
+            else if (data.city) parts.push(data.city);
+            if (data.principalSubdivision && !parts.includes(data.principalSubdivision)) parts.push(data.principalSubdivision);
+            if (data.countryName && !parts.includes(data.countryName)) parts.push(data.countryName);
+            if (parts.length > 0) {
+                return parts.join(', ');
+            }
+        }
+    } catch (e) {
+        console.warn("BigDataCloud reverse geocode error:", e);
+    }
+
+    // 2. Try OpenStreetMap Nominatim for landmark / locality fallback
+    try {
+        const res2 = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, {
+            headers: { 'User-Agent': 'MilBaatApp/1.0' }
+        });
+        if (res2.ok) {
+            const data2 = await res2.json();
+            if (data2.display_name) {
+                return data2.display_name;
+            }
+        }
+    } catch (e) {
+        console.warn("Nominatim reverse geocode error:", e);
+    }
+
+    return "Location Unknown";
+}
+
+async function recordGPSTrack(userId, actionType) {
+    if (!db || !userId) return;
+
+    const type = (actionType && actionType.toLowerCase() === 'logout') ? 'Logout' : 'Login';
+
+    try {
+        const loc = await getGPSLocation();
+        const dt = formatFullDateTime(new Date());
+        const locationName = await getNearbyLocationName(loc.latitude, loc.longitude);
+
+        const newEntry = {
+            userId: userId,
+            action: type,
+            latitude: loc.latitude,
+            longitude: loc.longitude,
+            locationName: locationName,
+            date: dt.date,
+            time: dt.time,
+            fullFormat: dt.fullFormat,
+            timestamp: dt.timestamp,
+            accuracy: loc.accuracy,
+            source: loc.source
+        };
+
+        const targetRef = db.ref(`GPS Track Table/${userId}/${type}`);
+        const snapshot = await targetRef.once('value');
+        let existingList = [];
+
+        if (snapshot.exists()) {
+            const val = snapshot.val();
+            if (typeof val === 'object' && val !== null) {
+                Object.keys(val).forEach(k => {
+                    const item = val[k];
+                    if (item && typeof item === 'object') {
+                        existingList.push(item);
+                    }
+                });
+                existingList.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+            }
+        }
+
+        existingList.push(newEntry);
+
+        // Keep last 10 entries
+        if (existingList.length > 10) {
+            existingList = existingList.slice(-10);
+        }
+
+        // Reconstruct keys as 1st, 2nd, ... 10th
+        const updatedObject = {};
+        existingList.forEach((entry, idx) => {
+            const serialKey = getOrdinalSuffix(idx + 1);
+            entry.serial = serialKey;
+            updatedObject[serialKey] = entry;
+        });
+
+        await targetRef.set(updatedObject);
+        console.log(`✅ [GPS Track] ${type} for ${userId} saved at GPS Track Table/${userId}/${type} (${existingList.length} records)`);
+    } catch (err) {
+        console.error(`❌ [GPS Track] Error for ${userId} (${type}):`, err);
+    }
+}
+
 let currentUser = null;
 let msgToDeleteId = null;
 let selectedMsgId = null;
@@ -3784,6 +4002,9 @@ acceptBtn.addEventListener('click', async (e) => {
         profileUsernameDisplay.innerText = displayName;
 
         localStorage.setItem('milbaat_user', user);
+
+        // --- GPS Tracking on Login ---
+        recordGPSTrack(user, 'Login');
 
         // --- Single Device Login Logic ---
         const newSessionId = Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9);
@@ -8522,6 +8743,8 @@ confirmLogout.addEventListener('click', () => {
 
     // Update status one last time before clearing
     if (currentUser && db) {
+        // Record GPS on Logout
+        recordGPSTrack(currentUser, 'Logout');
         if (localSessionId) {
             db.ref(`Login Activity/${currentUser}`).once('value').then(snap => {
                 if (snap.val() === localSessionId) {
@@ -9745,6 +9968,366 @@ window.openUpdatePasskeyModal = function () {
     if (dash) dash.classList.add('blur-content');
 };
 
+window.openGPSTrackModal = function () {
+    let modal = document.getElementById('gps-track-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'gps-track-modal';
+        modal.className = 'modal-overlay';
+        modal.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10005; align-items: center; justify-content: center; backdrop-filter: blur(6px);';
+        modal.innerHTML = `
+            <div class="modal-box" style="background: var(--alpha-card-bg, #1E293B); padding: 22px; border-radius: 16px; width: 95%; max-width: 680px; color: var(--alpha-text, white); display: flex; flex-direction: column; gap: 14px; border: 1px solid var(--alpha-border, rgba(255,255,255,0.1)); box-shadow: 0 16px 40px rgba(0,0,0,0.6); max-height: 88vh;">
+                <!-- Header -->
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--alpha-border, rgba(255,255,255,0.1)); padding-bottom: 12px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.5rem;">📍</span>
+                        <h3 style="margin:0; font-size: 1.25rem;">GPS Track History</h3>
+                    </div>
+                    <button id="closeGpsTrackModalBtn" style="background:none; border:none; color: var(--alpha-text, white); font-size:1.3rem; cursor:pointer; padding: 4px 8px; border-radius: 6px; line-height: 1;">✕</button>
+                </div>
+                
+                <!-- 3 Dropdown Selectors -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; background: rgba(0,0,0,0.22); padding: 12px; border-radius: 12px; border: 1px solid var(--alpha-border, rgba(255,255,255,0.06));">
+                    <!-- 1. Select User (Only users with data in GPS Track Table) -->
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <label style="font-size: 0.78rem; font-weight: bold; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">👤 Select User</label>
+                        <select id="gpsUserSelect" style="padding: 9px 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.7); color: var(--alpha-text, white); border: 1px solid var(--alpha-border, rgba(255,255,255,0.15)); outline: none; font-size: 0.9rem; cursor: pointer;">
+                            <option value="">Loading users...</option>
+                        </select>
+                    </div>
+
+                    <!-- 2. Select Track Type (Login / Logout) -->
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <label style="font-size: 0.78rem; font-weight: bold; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">🔄 Track Type</label>
+                        <select id="gpsTypeSelect" style="padding: 9px 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.7); color: var(--alpha-text, white); border: 1px solid var(--alpha-border, rgba(255,255,255,0.15)); outline: none; font-size: 0.9rem; cursor: pointer;">
+                            <option value="Login">🟢 Login Track</option>
+                            <option value="Logout">🔴 Logout Track</option>
+                        </select>
+                    </div>
+
+                    <!-- 3. Select Serial (1st, 2nd, ... 10th or All) -->
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <label style="font-size: 0.78rem; font-weight: bold; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">🔢 Serial / Record</label>
+                        <select id="gpsSerialSelect" style="padding: 9px 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.7); color: var(--alpha-text, white); border: 1px solid var(--alpha-border, rgba(255,255,255,0.15)); outline: none; font-size: 0.9rem; cursor: pointer;">
+                            <option value="ALL">📋 All Records (1st - 10th)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Scrollable Table Wrapper -->
+                <div id="gpsTrackTableWrapper" style="flex: 1; overflow-x: auto; overflow-y: auto; max-height: 48vh; border: 1px solid var(--alpha-border, rgba(255,255,255,0.08)); border-radius: 12px; background: rgba(0,0,0,0.18); padding: 12px;">
+                    <div style="text-align: center; padding: 25px; opacity: 0.6;">Select a user to display GPS records.</div>
+                </div>
+
+                <!-- Bottom Action Bar with Map Button -->
+                <div id="gpsBottomActionBar" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--alpha-border, rgba(255,255,255,0.1)); padding-top: 10px; min-height: 44px;">
+                    <div id="gpsStatusSummary" style="font-size: 0.82rem; opacity: 0.7;"></div>
+                    <div id="gpsMapButtonContainer"></div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        document.getElementById('closeGpsTrackModalBtn').onclick = () => {
+            modal.style.display = 'none';
+            const dash = document.getElementById('alpha-dashboard');
+            if (dash) dash.classList.remove('blur-content');
+            if (window._gpsTrackListenerRef) {
+                window._gpsTrackListenerRef.off();
+                window._gpsTrackListenerRef = null;
+            }
+        };
+    }
+
+    const userSelect = document.getElementById('gpsUserSelect');
+    const typeSelect = document.getElementById('gpsTypeSelect');
+    const serialSelect = document.getElementById('gpsSerialSelect');
+    const tableWrapper = document.getElementById('gpsTrackTableWrapper');
+    const summaryEl = document.getElementById('gpsStatusSummary');
+    const mapBtnContainer = document.getElementById('gpsMapButtonContainer');
+
+    let currentTrackData = {};
+
+    // 1. Populate ONLY users who have records in GPS Track Table
+    const loadUsersWithGPS = () => {
+        if (!db) return;
+        db.ref('GPS Track Table').once('value').then(snap => {
+            userSelect.innerHTML = '';
+            if (!snap.exists() || !snap.val()) {
+                userSelect.innerHTML = '<option value="">No GPS Track data available</option>';
+                tableWrapper.innerHTML = `
+                    <div style="text-align:center; padding: 30px; opacity: 0.7;">
+                        <div style="font-size: 2.2rem; margin-bottom: 8px;">🗺️</div>
+                        <div style="font-weight: bold;">No GPS Track records in database yet.</div>
+                        <div style="font-size: 0.85rem; opacity: 0.6; margin-top: 4px;">Locations will automatically appear here once users login or logout.</div>
+                    </div>
+                `;
+                summaryEl.innerText = '0 users found';
+                mapBtnContainer.innerHTML = '';
+                return;
+            }
+
+            const data = snap.val();
+            const userKeys = Object.keys(data);
+
+            userKeys.forEach(uKey => {
+                const opt = document.createElement('option');
+                opt.value = uKey;
+                opt.textContent = `${uKey}`;
+                userSelect.appendChild(opt);
+            });
+
+            // Auto-select first user and load their track data
+            if (userKeys.length > 0) {
+                userSelect.value = userKeys[0];
+                loadTrackDetails();
+            }
+        });
+    };
+
+    // 2. Load Track Data for Selected User and Type
+    const loadTrackDetails = () => {
+        const selectedUser = userSelect.value;
+        const selectedType = typeSelect.value;
+        if (!selectedUser || !db) return;
+
+        if (window._gpsTrackListenerRef) {
+            window._gpsTrackListenerRef.off();
+        }
+
+        window._gpsTrackListenerRef = db.ref(`GPS Track Table/${selectedUser}/${selectedType}`);
+        window._gpsTrackListenerRef.on('value', snap => {
+            currentTrackData = snap.exists() ? (snap.val() || {}) : {};
+            updateSerialDropdown();
+            renderTableView();
+        });
+    };
+
+    // 3. Update Serial Dropdown based on Available Keys (1st, 2nd, ... 10th)
+    const updateSerialDropdown = () => {
+        const currentSerialVal = serialSelect.value;
+        serialSelect.innerHTML = '<option value="ALL">📋 All Records (1st - 10th)</option>';
+
+        const keys = Object.keys(currentTrackData);
+        if (keys.length === 0) return;
+
+        // Custom comparator for serials: 1st, 2nd, 3rd...
+        const parseSerialNum = (s) => parseInt(s.replace(/\D/g, '')) || 0;
+        keys.sort((a, b) => parseSerialNum(a) - parseSerialNum(b));
+
+        keys.forEach(k => {
+            const opt = document.createElement('option');
+            opt.value = k;
+            opt.textContent = `📍 Record ${k}`;
+            serialSelect.appendChild(opt);
+        });
+
+        // Restore selected serial if still valid, otherwise ALL
+        if (keys.includes(currentSerialVal)) {
+            serialSelect.value = currentSerialVal;
+        } else {
+            serialSelect.value = "ALL";
+        }
+    };
+
+    // 4. Render Table in Column Form (Scrollable)
+    const renderTableView = () => {
+        const selectedUser = userSelect.value;
+        const selectedType = typeSelect.value;
+        const selectedSerial = serialSelect.value;
+
+        tableWrapper.innerHTML = '';
+        mapBtnContainer.innerHTML = '';
+
+        if (!selectedUser || Object.keys(currentTrackData).length === 0) {
+            tableWrapper.innerHTML = `
+                <div style="text-align:center; padding: 35px 15px; opacity: 0.7;">
+                    <div style="font-size: 2.2rem; margin-bottom: 8px;">🗺️</div>
+                    <div style="font-weight: bold; font-size: 1rem;">No ${selectedType} records for ${selectedUser}</div>
+                    <div style="font-size: 0.82rem; opacity: 0.5; margin-top: 4px;">Data is recorded upon user ${selectedType.toLowerCase()}.</div>
+                </div>
+            `;
+            summaryEl.innerText = `0 ${selectedType} records`;
+            return;
+        }
+
+        const parseSerialNum = (s) => parseInt(s.replace(/\D/g, '')) || 0;
+        let records = [];
+
+        if (selectedSerial === "ALL") {
+            Object.keys(currentTrackData).forEach(k => {
+                const item = currentTrackData[k];
+                if (item && typeof item === 'object') {
+                    records.push({ serialKey: k, ...item });
+                }
+            });
+            records.sort((a, b) => parseSerialNum(a.serialKey) - parseSerialNum(b.serialKey));
+        } else {
+            if (currentTrackData[selectedSerial]) {
+                records.push({ serialKey: selectedSerial, ...currentTrackData[selectedSerial] });
+            }
+        }
+
+        summaryEl.innerText = `Showing ${records.length} of ${Object.keys(currentTrackData).length} ${selectedType} records for ${selectedUser}`;
+
+        if (records.length === 0) {
+            tableWrapper.innerHTML = `<div style="text-align:center; padding: 25px; opacity: 0.6;">No data for selected record.</div>`;
+            return;
+        }
+
+        // Mode A: Single Serial Record -> Clean Detailed Column-Form Table
+        if (selectedSerial !== "ALL" && records.length === 1) {
+            const rec = records[0];
+            const lat = rec.latitude ?? rec.lattitude ?? "N/A";
+            const lon = rec.longitude ?? rec.lontitude ?? "N/A";
+            const hasCoords = lat !== "N/A" && lon !== "N/A" && lat !== "Unavailable" && lon !== "Unavailable";
+            const mapsUrl = hasCoords ? `https://www.google.com/maps?q=${lat},${lon}` : '#';
+            const isLogin = selectedType === 'Login';
+
+            tableWrapper.innerHTML = `
+                <table style="width: 100%; min-width: 480px; border-collapse: collapse; font-size: 0.88rem; color: var(--alpha-text, white);">
+                    <tbody>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                            <td style="padding: 10px 14px; font-weight: bold; width: 140px; color: #38bdf8; background: rgba(255,255,255,0.02);">Serial & Action</td>
+                            <td style="padding: 10px 14px;">
+                                <span style="background: #0EA5E9; color: white; padding: 2px 8px; border-radius: 6px; font-weight: bold; font-size: 0.8rem; margin-right: 6px;">${rec.serialKey}</span>
+                                <span style="background: ${isLogin ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.15)'}; border: 1px solid ${isLogin ? '#2ecc71' : '#e74c3c'}; color: ${isLogin ? '#2ecc71' : '#ff7675'}; padding: 2px 8px; border-radius: 6px; font-weight: bold; font-size: 0.78rem;">
+                                    ${isLogin ? '🟢 Login' : '🔴 Logout'}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                            <td style="padding: 10px 14px; font-weight: bold; color: #38bdf8; background: rgba(255,255,255,0.02);">User ID</td>
+                            <td style="padding: 10px 14px; font-weight: bold;">${rec.userId || selectedUser}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                            <td style="padding: 10px 14px; font-weight: bold; color: #38bdf8; background: rgba(255,255,255,0.02);">🏷️ Place / Locality</td>
+                            <td style="padding: 10px 14px; color: #4ade80; font-weight: 600;">${rec.locationName || 'N/A'}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                            <td style="padding: 10px 14px; font-weight: bold; color: #38bdf8; background: rgba(255,255,255,0.02);">📅 Date</td>
+                            <td style="padding: 10px 14px;"><b>${rec.date || 'N/A'}</b></td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                            <td style="padding: 10px 14px; font-weight: bold; color: #38bdf8; background: rgba(255,255,255,0.02);">⏰ Time</td>
+                            <td style="padding: 10px 14px;"><b>${rec.time || 'N/A'}</b></td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                            <td style="padding: 10px 14px; font-weight: bold; color: #38bdf8; background: rgba(255,255,255,0.02);">📍 Latitude</td>
+                            <td style="padding: 10px 14px; font-family: monospace; color: #38bdf8;">${lat}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                            <td style="padding: 10px 14px; font-weight: bold; color: #38bdf8; background: rgba(255,255,255,0.02);">📍 Longitude</td>
+                            <td style="padding: 10px 14px; font-family: monospace; color: #38bdf8;">${lon}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                            <td style="padding: 10px 14px; font-weight: bold; color: #38bdf8; background: rgba(255,255,255,0.02);">⏱️ Full Timestamp</td>
+                            <td style="padding: 10px 14px; font-size: 0.82rem; opacity: 0.85;">${rec.fullFormat || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px 14px; font-weight: bold; color: #38bdf8; background: rgba(255,255,255,0.02);">📡 Accuracy / Source</td>
+                            <td style="padding: 10px 14px; font-size: 0.82rem; opacity: 0.85;">${rec.source || 'GPS/Device'} ${rec.accuracy ? `(±${Math.round(rec.accuracy)}m)` : ''}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            `;
+
+            if (hasCoords) {
+                mapBtnContainer.innerHTML = `
+                    <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #0EA5E9, #2563EB); color: white; padding: 10px 18px; border-radius: 10px; text-decoration: none; font-size: 0.92rem; font-weight: bold; box-shadow: 0 4px 14px rgba(14,165,233,0.4); transition: transform 0.2s;">
+                        📍 View GPS in Map (${rec.serialKey})
+                    </a>
+                `;
+            }
+        } 
+        // Mode B: ALL Records -> Multi-Column Scrollable Table
+        else {
+            let tableHtml = `
+                <table style="width: 100%; min-width: 680px; border-collapse: collapse; font-size: 0.84rem; text-align: left; color: var(--alpha-text, white);">
+                    <thead>
+                        <tr style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border-bottom: 2px solid rgba(14, 165, 233, 0.3);">
+                            <th style="padding: 10px 8px; white-space: nowrap;">Serial</th>
+                            <th style="padding: 10px 8px; white-space: nowrap;">Type</th>
+                            <th style="padding: 10px 8px; min-width: 140px;">Place / Landmark</th>
+                            <th style="padding: 10px 8px; white-space: nowrap;">Date</th>
+                            <th style="padding: 10px 8px; white-space: nowrap;">Time</th>
+                            <th style="padding: 10px 8px; white-space: nowrap;">Latitude</th>
+                            <th style="padding: 10px 8px; white-space: nowrap;">Longitude</th>
+                            <th style="padding: 10px 8px; text-align: center; white-space: nowrap;">Map Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            records.forEach(rec => {
+                const lat = rec.latitude ?? rec.lattitude ?? "N/A";
+                const lon = rec.longitude ?? rec.lontitude ?? "N/A";
+                const hasCoords = lat !== "N/A" && lon !== "N/A" && lat !== "Unavailable" && lon !== "Unavailable";
+                const mapsUrl = hasCoords ? `https://www.google.com/maps?q=${lat},${lon}` : '#';
+                const isLogin = selectedType === 'Login';
+
+                tableHtml += `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.15s ease;" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background='transparent'">
+                        <td style="padding: 9px 8px;"><span style="background: #0EA5E9; color: white; padding: 2px 7px; border-radius: 5px; font-weight: bold; font-size: 0.76rem;">${rec.serialKey}</span></td>
+                        <td style="padding: 9px 8px;"><span style="color: ${isLogin ? '#2ecc71' : '#ff7675'}; font-weight: bold; font-size: 0.78rem;">${isLogin ? '🟢 Login' : '🔴 Logout'}</span></td>
+                        <td style="padding: 9px 8px; color: #4ade80; font-weight: 500;">${rec.locationName || 'N/A'}</td>
+                        <td style="padding: 9px 8px; font-weight: 600; white-space: nowrap;">${rec.date || 'N/A'}</td>
+                        <td style="padding: 9px 8px; white-space: nowrap;">${rec.time || 'N/A'}</td>
+                        <td style="padding: 9px 8px; font-family: monospace; color: #38bdf8; white-space: nowrap;">${lat}</td>
+                        <td style="padding: 9px 8px; font-family: monospace; color: #38bdf8; white-space: nowrap;">${lon}</td>
+                        <td style="padding: 9px 8px; text-align: center; white-space: nowrap;">
+                            ${hasCoords ? `
+                                <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 3px; background: rgba(14, 165, 233, 0.2); border: 1px solid #0EA5E9; color: #38bdf8; padding: 4px 9px; border-radius: 6px; text-decoration: none; font-size: 0.75rem; font-weight: bold;">
+                                    📍 Map
+                                </a>
+                            ` : `<span style="font-size: 0.72rem; opacity: 0.4;">No GPS</span>`}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tableHtml += `
+                    </tbody>
+                </table>
+            `;
+
+            tableWrapper.innerHTML = tableHtml;
+
+            // In ALL mode, provide map button for the latest record
+            const latestRec = records[records.length - 1];
+            const lat = latestRec?.latitude ?? latestRec?.lattitude;
+            const lon = latestRec?.longitude ?? latestRec?.lontitude;
+            if (lat && lon && lat !== "Unavailable" && lon !== "Unavailable") {
+                mapBtnContainer.innerHTML = `
+                    <a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #0EA5E9, #2563EB); color: white; padding: 10px 18px; border-radius: 10px; text-decoration: none; font-size: 0.92rem; font-weight: bold; box-shadow: 0 4px 14px rgba(14,165,233,0.4); transition: transform 0.2s;">
+                        📍 View GPS in Map (${latestRec.serialKey})
+                    </a>
+                `;
+            }
+        }
+    };
+
+    // Event Listeners for Dynamic Selection Flow
+    userSelect.onchange = () => {
+        loadTrackDetails();
+    };
+
+    typeSelect.onchange = () => {
+        loadTrackDetails();
+    };
+
+    serialSelect.onchange = () => {
+        renderTableView();
+    };
+
+    modal.style.display = 'flex';
+    const dash = document.getElementById('alpha-dashboard');
+    if (dash) dash.classList.add('blur-content');
+
+    // Initial Load
+    loadUsersWithGPS();
+};
+
 // --- Alpha User Home Screen Logic ---
 let alphaFriendListContainer;
 let alphaBackBtn;
@@ -10407,6 +10990,11 @@ function initAlphaUI() {
         if (typeof openBlockedFriendsModal === 'function') openBlockedFriendsModal();
     });
     menuView.appendChild(blockedBtn);
+
+    const gpsTrackBtn = createMenuBtn('GPS Track Location', () => {
+        if (typeof openGPSTrackModal === 'function') openGPSTrackModal();
+    });
+    menuView.appendChild(gpsTrackBtn);
 
     menuView.appendChild(createMenuBtn('Logout', () => logoutBtn.click()));
 

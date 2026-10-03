@@ -62,7 +62,7 @@ const server = http.createServer((req, res) => {
 
     let filePath = '.' + decodeURI(req.url);
     if (filePath === './') {
-        filePath = './milbaat.html';
+        filePath = fs.existsSync('./milbaat.html') ? './milbaat.html' : './index.html';
     }
 
     const extname = String(path.extname(filePath)).toLowerCase();
