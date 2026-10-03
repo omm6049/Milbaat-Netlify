@@ -1870,6 +1870,80 @@ window.copyCoordinatesFromBtn = function (btn) {
     window.copyCoordinatesToClipboard(text, btn);
 };
 
+window.openGoogleMapsDirections = function (lat, lon, event) {
+    if (!lat || !lon || lat === "Unavailable" || lon === "Unavailable") return true;
+
+    const isAndroid = /android/i.test(navigator.userAgent);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+
+    if (isAndroid) {
+        if (event) event.preventDefault();
+        // Launch Google Maps app on Android via Intent scheme
+        const androidIntentUrl = `intent://maps.google.com/maps/dir/?api=1&destination=${lat},${lon}#Intent;scheme=https;package=com.google.android.apps.maps;end`;
+        window.location.href = androidIntentUrl;
+        return false;
+    } else if (isIOS) {
+        if (event) event.preventDefault();
+        // Launch Google Maps app on iOS scheme with web fallback
+        const gmapsAppUrl = `comgooglemaps://?daddr=${lat},${lon}&directionsmode=driving`;
+        const start = Date.now();
+        window.location.href = gmapsAppUrl;
+        setTimeout(() => {
+            if (Date.now() - start < 1500) {
+                window.open(webUrl, '_blank', 'noopener,noreferrer');
+            }
+        }, 700);
+        return false;
+    }
+
+    // On Desktop, allow default anchor navigation to open in new tab
+    if (event) {
+        return true;
+    }
+    window.open(webUrl, '_blank', 'noopener,noreferrer');
+    return false;
+};
+
+window.openGoogleMapsLocation = function (lat, lon, encodedPlace, event) {
+    if (!lat || !lon || lat === "Unavailable" || lon === "Unavailable") return true;
+
+    const placeName = decodeURIComponent(encodedPlace || '');
+    const isAndroid = /android/i.test(navigator.userAgent);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const query = placeName || `${lat},${lon}`;
+    const webUrl = placeName 
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(placeName)}`
+        : `https://www.google.com/maps?q=${lat},${lon}`;
+
+    if (isAndroid) {
+        if (event) event.preventDefault();
+        // Launch Google Maps app on Android
+        const androidIntentUrl = `intent://maps.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}#Intent;scheme=https;package=com.google.android.apps.maps;end`;
+        window.location.href = androidIntentUrl;
+        return false;
+    } else if (isIOS) {
+        if (event) event.preventDefault();
+        // Launch Google Maps app on iOS
+        const gmapsAppUrl = `comgooglemaps://?q=${encodeURIComponent(query)}`;
+        const start = Date.now();
+        window.location.href = gmapsAppUrl;
+        setTimeout(() => {
+            if (Date.now() - start < 1500) {
+                window.open(webUrl, '_blank', 'noopener,noreferrer');
+            }
+        }, 700);
+        return false;
+    }
+
+    // On Desktop, allow default anchor navigation
+    if (event) {
+        return true;
+    }
+    window.open(webUrl, '_blank', 'noopener,noreferrer');
+    return false;
+};
+
 async function recordGPSTrack(userId, actionType) {
     if (!db || !userId) return;
 
@@ -10400,6 +10474,14 @@ window.openGPSTrackModal = function () {
                     white-space: nowrap;
                     flex-shrink: 0;
                 }
+                .gps-direction-btn, .gps-map-btn {
+                    transition: all 0.2s ease;
+                }
+                .gps-direction-btn:hover, .gps-map-btn:hover {
+                    transform: translateY(-2px);
+                    filter: brightness(1.12);
+                    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+                }
             </style>
             <div class="modal-box" style="background: var(--alpha-card-bg, #1E293B); padding: 20px 16px; border-radius: 16px; width: 95%; max-width: 580px; color: var(--alpha-text, white); display: flex; flex-direction: column; gap: 14px; border: 1px solid var(--alpha-border, rgba(255,255,255,0.1)); box-shadow: 0 16px 40px rgba(0,0,0,0.6); max-height: 90vh; box-sizing: border-box;">
                 <!-- Header -->
@@ -10652,14 +10734,18 @@ window.openGPSTrackModal = function () {
         const hasCoords = lat !== "N/A" && lon !== "N/A" && lat !== "Unavailable" && lon !== "Unavailable";
         
         let mapsUrl = '#';
+        let directionsUrl = '#';
+        let cleanPlace = '';
         if (hasCoords) {
             const locName = (rec.locationName && rec.locationName !== 'N/A' && rec.locationName !== 'Location Unknown' && rec.locationName !== 'Location Unavailable') ? rec.locationName : '';
             if (locName) {
-                const cleanPlace = locName.replace(/^Near\s+/i, '').replace(/\s*\([^)]*\)/g, '').trim();
+                cleanPlace = locName.replace(/^Near\s+/i, '').replace(/\s*\([^)]*\)/g, '').trim();
                 mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cleanPlace || `${lat},${lon}`)}`;
             } else {
                 mapsUrl = `https://www.google.com/maps?q=${lat},${lon}`;
             }
+            // Direct turn-by-turn route from user's live current location to this GPS track point
+            directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
         }
         const dmsString = (rec.dmsCoordinates && rec.dmsCoordinates !== 'N/A') ? rec.dmsCoordinates : (hasCoords ? convertToDMS(lat, lon) : 'N/A');
 
@@ -10747,10 +10833,13 @@ window.openGPSTrackModal = function () {
                     <span class="gps-detail-value" style="opacity: 0.9;">${rec.source || 'GPS/Device'} ${rec.accuracy ? `(±${Math.round(rec.accuracy)}m)` : ''}</span>
                 </div>
 
-                <!-- Row 13: Dedicated Single-Line Map Button -->
+                <!-- Row 13: Dedicated Direction & Map Buttons Side by Side -->
                 ${hasCoords ? `
-                    <div style="min-width: 100%; width: 100%; margin-top: 4px; box-sizing: border-box;">
-                        <a href="${mapsUrl}" class="gps-map-btn" target="_blank" rel="noopener noreferrer" style="display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, #0EA5E9, #2563EB); color: white; padding: 11px 16px; border-radius: 9px; text-decoration: none; font-size: 0.9rem; font-weight: bold; width: 100%; box-shadow: 0 4px 12px rgba(14,165,233,0.35); transition: transform 0.2s; white-space: nowrap; box-sizing: border-box;">
+                    <div style="min-width: 100%; width: 100%; margin-top: 6px; display: flex; gap: 8px; flex-wrap: nowrap; box-sizing: border-box;">
+                        <a href="${directionsUrl}" onclick="openGoogleMapsDirections('${lat}', '${lon}', event)" class="gps-direction-btn" target="_blank" rel="noopener noreferrer" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; background: linear-gradient(135deg, #10B981, #059669); color: white; padding: 11px 14px; border-radius: 9px; text-decoration: none; font-size: 0.88rem; font-weight: bold; box-shadow: 0 4px 12px rgba(16,185,129,0.35); white-space: nowrap; box-sizing: border-box; cursor: pointer;">
+                            🧭 Get Direction
+                        </a>
+                        <a href="${mapsUrl}" onclick="openGoogleMapsLocation('${lat}', '${lon}', '${encodeURIComponent(cleanPlace || '')}', event)" class="gps-map-btn" target="_blank" rel="noopener noreferrer" style="flex: 1.1; display: flex; align-items: center; justify-content: center; gap: 6px; background: linear-gradient(135deg, #0EA5E9, #2563EB); color: white; padding: 11px 14px; border-radius: 9px; text-decoration: none; font-size: 0.88rem; font-weight: bold; box-shadow: 0 4px 12px rgba(14,165,233,0.35); white-space: nowrap; box-sizing: border-box; cursor: pointer;">
                             📍 View GPS in Map (${serial})
                         </a>
                     </div>
@@ -10804,7 +10893,7 @@ window.openGPSTrackModal = function () {
         const isLogin = selectedType === 'Login';
         tableWrapper.innerHTML = createSingleRecordCardHTML(selectedSerial, rec, isLogin, selectedUser);
 
-        // Enhance location with nearest marked landmark (within <= 80m) if not already populated with a landmark
+        // Enhance location with nearest marked landmark (within <= 100m) if not already populated with a landmark
         const lat = rec.latitude ?? rec.lattitude;
         const lon = rec.longitude ?? rec.lontitude;
         if (lat && lon && lat !== "Unavailable" && lon !== "Unavailable" && (!rec.locationName || !rec.locationName.startsWith('Near '))) {
@@ -10816,8 +10905,14 @@ window.openGPSTrackModal = function () {
                     }
                     const mapBtnEl = tableWrapper.querySelector('.gps-map-btn');
                     if (mapBtnEl) {
-                        const cleanPlace = enhancedPlace.replace(/^Near\s+/i, '').trim();
-                        mapBtnEl.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cleanPlace)}`;
+                        const cleanPlace = enhancedPlace.replace(/^Near\s+/i, '').replace(/\s*\([^)]*\)/g, '').trim();
+                        mapBtnEl.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cleanPlace || `${lat},${lon}`)}`;
+                        mapBtnEl.setAttribute('onclick', `openGoogleMapsLocation('${lat}', '${lon}', '${encodeURIComponent(cleanPlace || '')}', event)`);
+                    }
+                    const dirBtnEl = tableWrapper.querySelector('.gps-direction-btn');
+                    if (dirBtnEl) {
+                        dirBtnEl.href = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+                        dirBtnEl.setAttribute('onclick', `openGoogleMapsDirections('${lat}', '${lon}', event)`);
                     }
                     if (db && selectedUser && selectedType && selectedSerial) {
                         db.ref(`GPS Track Table/${selectedUser}/${selectedType}/${selectedSerial}/locationName`).set(enhancedPlace).catch(() => {});
