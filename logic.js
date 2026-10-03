@@ -1484,34 +1484,17 @@ function formatFullDateTime(d = new Date()) {
 }
 
 async function fetchIPLocationFallback() {
-    // 1. Primary IP Fallback (ipapi.co)
+    // 1. Primary: ipwho.is (provides IP, lat/lon, ISP, City, Region)
     try {
-        const res = await fetch('https://ipapi.co/json/');
+        const res = await fetch('https://ipwho.is/');
         if (res.ok) {
             const data = await res.json();
-            if (data.latitude && data.longitude) {
+            if (data && data.success !== false && data.latitude && data.longitude) {
                 return {
                     latitude: data.latitude,
                     longitude: data.longitude,
                     accuracy: null,
-                    source: "IP Geolocation"
-                };
-            }
-        }
-    } catch (e) {
-        console.warn("ipapi.co fallback failed:", e);
-    }
-
-    // 2. Secondary IP Fallback (ipwho.is)
-    try {
-        const res2 = await fetch('https://ipwho.is/');
-        if (res2.ok) {
-            const data2 = await res2.json();
-            if (data2.latitude && data2.longitude) {
-                return {
-                    latitude: data2.latitude,
-                    longitude: data2.longitude,
-                    accuracy: null,
+                    deviceIp: data.ip || "Auto-Recognized",
                     source: "IP Geolocation"
                 };
             }
@@ -1520,44 +1503,166 @@ async function fetchIPLocationFallback() {
         console.warn("ipwho.is fallback failed:", e);
     }
 
+    // 2. Secondary: freeipapi.com
+    try {
+        const res2 = await fetch('https://freeipapi.com/api/json');
+        if (res2.ok) {
+            const data2 = await res2.json();
+            if (data2 && data2.latitude && data2.longitude) {
+                return {
+                    latitude: data2.latitude,
+                    longitude: data2.longitude,
+                    accuracy: null,
+                    deviceIp: data2.ipAddress || "Auto-Recognized",
+                    source: "IP Geolocation"
+                };
+            }
+        }
+    } catch (e) {
+        console.warn("freeipapi.com fallback failed:", e);
+    }
+
+    // 3. Tertiary: ipapi.co
+    try {
+        const res3 = await fetch('https://ipapi.co/json/');
+        if (res3.ok) {
+            const data3 = await res3.json();
+            if (data3 && data3.latitude && data3.longitude) {
+                return {
+                    latitude: data3.latitude,
+                    longitude: data3.longitude,
+                    accuracy: null,
+                    deviceIp: data3.ip || "Auto-Recognized",
+                    source: "IP Geolocation"
+                };
+            }
+        }
+    } catch (e) {
+        console.warn("ipapi.co fallback failed:", e);
+    }
+
     return {
         latitude: "Unavailable",
         longitude: "Unavailable",
         accuracy: null,
+        deviceIp: "Unavailable",
         source: "Unavailable"
     };
 }
 
-function getGPSLocation() {
-    return new Promise((resolve) => {
-        if (!navigator.geolocation) {
-            console.warn("Geolocation API is not supported in this browser.");
-            fetchIPLocationFallback().then(resolve);
-            return;
+async function getGPSLocation() {
+    // 1. Check Permissions API to avoid prompting if already decided/denied
+    let permissionState = 'prompt';
+    if (navigator.permissions && navigator.permissions.query) {
+        try {
+            const status = await navigator.permissions.query({ name: 'geolocation' });
+            permissionState = status.state;
+            if (permissionState === 'denied') {
+                console.log("📍 [GPS Track] Geolocation permission previously denied; auto-recognizing Device IP...");
+                return await fetchIPLocationFallback();
+            }
+        } catch (e) {
+            // Permissions query not supported in all browsers
         }
+    }
 
-        const options = {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0
+    if (!navigator.geolocation) {
+        console.warn("Geolocation API is not supported in this browser; auto-recognizing Device IP...");
+        return await fetchIPLocationFallback();
+    }
+
+    // Try fetching device IP in parallel so device IP is always available
+    let deviceIp = "Auto-Recognized";
+    fetch('https://ipwho.is/').then(r => r.json()).then(d => { if (d && d.ip) deviceIp = d.ip; }).catch(() => {});
+
+    return new Promise((resolve) => {
+        let isResolved = false;
+        let bestPosition = null;
+        let watchId = null;
+
+        const cleanup = () => {
+            if (watchId !== null && navigator.geolocation && navigator.geolocation.clearWatch) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
         };
 
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
+        const finish = (pos) => {
+            if (isResolved) return;
+            isResolved = true;
+            cleanup();
+            if (pos && pos.coords) {
+                console.log(`📍 [GPS Track] Acquired position: lat=${pos.coords.latitude}, lon=${pos.coords.longitude}, accuracy=±${Math.round(pos.coords.accuracy || 0)}m`);
                 resolve({
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                    accuracy: position.coords.accuracy || null,
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude,
+                    accuracy: pos.coords.accuracy || null,
+                    deviceIp: deviceIp,
                     source: "GPS/Device"
                 });
-            },
-            (error) => {
-                console.warn("GPS Geolocation error:", error.message);
+            } else {
+                console.warn("GPS request timed out or unavailable; auto-recognizing Device IP...");
                 fetchIPLocationFallback().then(resolve);
-            },
-            options
-        );
+            }
+        };
+
+        // Allow up to 5s to acquire best satellite lock (or 8s if permission prompt needed)
+        const timeoutDuration = permissionState === 'granted' ? 5000 : 8000;
+        const timer = setTimeout(() => {
+            if (!isResolved) {
+                if (bestPosition) {
+                    finish(bestPosition);
+                } else {
+                    finish(null);
+                }
+            }
+        }, timeoutDuration);
+
+        try {
+            watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    if (isResolved) return;
+                    const acc = position.coords.accuracy;
+
+                    // Track best position with lowest accuracy error
+                    if (!bestPosition || (acc && acc < (bestPosition.coords.accuracy || Infinity))) {
+                        bestPosition = position;
+                    }
+
+                    // If high-precision satellite accuracy achieved (<= 25m), resolve immediately!
+                    if (acc && acc <= 25) {
+                        clearTimeout(timer);
+                        finish(position);
+                    }
+                },
+                (error) => {
+                    if (error.code === error.PERMISSION_DENIED) {
+                        clearTimeout(timer);
+                        finish(null);
+                    }
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: timeoutDuration,
+                    maximumAge: 0 // Force fresh satellite/hardware sensor query
+                }
+            );
+        } catch (e) {
+            clearTimeout(timer);
+            finish(null);
+        }
     });
+}
+
+function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371000; // Earth radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
 }
 
 async function getNearbyLocationName(lat, lon) {
@@ -1565,41 +1670,205 @@ async function getNearbyLocationName(lat, lon) {
         return "Location Unavailable";
     }
 
-    // 1. Try BigDataCloud Client Reverse Geocode API
-    try {
-        const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`);
-        if (res.ok) {
-            const data = await res.json();
-            const parts = [];
-            if (data.locality) parts.push(data.locality);
-            else if (data.city) parts.push(data.city);
-            if (data.principalSubdivision && !parts.includes(data.principalSubdivision)) parts.push(data.principalSubdivision);
-            if (data.countryName && !parts.includes(data.countryName)) parts.push(data.countryName);
-            if (parts.length > 0) {
-                return parts.join(', ');
-            }
-        }
-    } catch (e) {
-        console.warn("BigDataCloud reverse geocode error:", e);
-    }
+    const latNum = parseFloat(lat);
+    const lonNum = parseFloat(lon);
+    if (isNaN(latNum) || isNaN(lonNum)) return "Location Unavailable";
 
-    // 2. Try OpenStreetMap Nominatim for landmark / locality fallback
     try {
-        const res2 = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, {
-            headers: { 'User-Agent': 'MilBaatApp/1.0' }
-        });
-        if (res2.ok) {
-            const data2 = await res2.json();
-            if (data2.display_name) {
-                return data2.display_name;
+        // Query Photon, Nominatim, and BigDataCloud concurrently in parallel for fastest and most complete POI detection
+        const [photonRes, nominatimRes, bdcRes] = await Promise.allSettled([
+            fetch(`https://photon.komoot.io/reverse?lat=${latNum}&lon=${lonNum}&limit=20`, {
+                headers: { 'User-Agent': 'MilBaatApp/1.0' }
+            }).then(r => r.ok ? r.json() : null),
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latNum}&lon=${lonNum}&zoom=18&addressdetails=1`, {
+                headers: { 'User-Agent': 'MilBaatApp/1.0' }
+            }).then(r => r.ok ? r.json() : null),
+            fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latNum}&longitude=${lonNum}&localityLanguage=en`)
+                .then(r => r.ok ? r.json() : null)
+        ]);
+
+        let detectedLandmark = null;
+        let minDistance = 999999;
+        let streetName = '';
+        let localityName = '';
+        let cityName = '';
+        let stateName = '';
+
+        const nonPlaceNames = new Set(['unnamed road', 'unnamed', 'service road', 'residential road']);
+
+        // 1. Process Photon POIs (find closest marked place/venue within <= 100m)
+        if (photonRes.status === 'fulfilled' && photonRes.value && photonRes.value.features) {
+            for (const f of photonRes.value.features) {
+                const p = f.properties;
+                const coords = f.geometry && f.geometry.coordinates; // [lon, lat]
+                if (p) {
+                    if (p.street && !streetName) streetName = p.street;
+                    if ((p.locality || p.district) && !localityName) localityName = p.locality || p.district;
+                    if (p.city && !cityName) cityName = p.city;
+                    if (p.state && !stateName) stateName = p.state;
+
+                    const osmKey = (p.osm_key || '').toLowerCase();
+                    const name = (p.name || '').trim();
+
+                    // Road / highway entries provide street names
+                    if (osmKey === 'highway' || osmKey === 'railway') {
+                        if (name && !streetName) streetName = name;
+                    } else if (name && coords && coords.length >= 2 && !nonPlaceNames.has(name.toLowerCase())) {
+                        // Actual marked venue / POI (shop, restaurant, hotel, amenity, leisure, tourism, etc.)
+                        const dist = calculateDistanceMeters(latNum, lonNum, coords[1], coords[0]);
+                        if (dist <= 100 && dist < minDistance) {
+                            minDistance = dist;
+                            detectedLandmark = name;
+                        }
+                    }
+                }
             }
         }
-    } catch (e) {
-        console.warn("Nominatim reverse geocode error:", e);
+
+        // 2. Process Nominatim details (find any closest landmark/amenity within <= 100m)
+        if (nominatimRes.status === 'fulfilled' && nominatimRes.value && nominatimRes.value.address) {
+            const addr = nominatimRes.value.address;
+            const nLat = parseFloat(nominatimRes.value.lat);
+            const nLon = parseFloat(nominatimRes.value.lon);
+            let dist = 999999;
+            if (!isNaN(nLat) && !isNaN(nLon)) {
+                dist = calculateDistanceMeters(latNum, lonNum, nLat, nLon);
+            }
+
+            const landmark = addr.amenity || addr.shop || addr.tourism || addr.leisure || addr.building || addr.office || addr.hotel || addr.restaurant || addr.cafe || addr.pub || addr.bar || addr.fast_food || addr.commercial;
+            if (landmark && dist <= 100 && dist < minDistance) {
+                minDistance = dist;
+                detectedLandmark = landmark;
+            }
+
+            if (addr.road && !streetName) streetName = addr.road;
+            if ((addr.neighbourhood || addr.suburb || addr.residential) && !localityName) localityName = addr.neighbourhood || addr.suburb || addr.residential;
+            if ((addr.city || addr.town || addr.village) && !cityName) cityName = addr.city || addr.town || addr.village;
+            if (addr.state && !stateName) stateName = addr.state;
+        }
+
+        // 3. Process BigDataCloud for fallback city/locality/state
+        if (bdcRes.status === 'fulfilled' && bdcRes.value) {
+            const b = bdcRes.value;
+            if (b.locality && !localityName) localityName = b.locality;
+            if (b.city && !cityName) cityName = b.city;
+            if (b.principalSubdivision && !stateName) stateName = b.principalSubdivision;
+        }
+
+        // Build the cleanest, most accurate single-line location description
+        const parts = [];
+        if (detectedLandmark && minDistance <= 100) {
+            parts.push(`Near ${detectedLandmark} (~${Math.round(minDistance)}m)`);
+        }
+        if (streetName && !parts.includes(streetName)) parts.push(streetName);
+        if (localityName && !parts.includes(localityName)) parts.push(localityName);
+        if (cityName && !parts.includes(cityName)) parts.push(cityName);
+        if (stateName && !parts.includes(stateName)) parts.push(stateName);
+
+        if (parts.length > 0) {
+            return parts.join(', ');
+        }
+    } catch (err) {
+        console.warn("Location resolution error:", err);
     }
 
     return "Location Unknown";
 }
+
+function convertToDMS(lat, lon) {
+    const latNum = parseFloat(lat);
+    const lonNum = parseFloat(lon);
+    if (isNaN(latNum) || isNaN(lonNum)) return "N/A";
+
+    const toDMS = (deg, isLat) => {
+        const dir = isLat ? (deg >= 0 ? 'N' : 'S') : (deg >= 0 ? 'E' : 'W');
+        const absDeg = Math.abs(deg);
+        let d = Math.floor(absDeg);
+        const minFloat = (absDeg - d) * 60;
+        let m = Math.floor(minFloat);
+        let sec = (minFloat - m) * 60;
+
+        let sStr = sec.toFixed(1);
+        if (parseFloat(sStr) >= 60) {
+            sec = 0;
+            sStr = "0.0";
+            m += 1;
+        }
+        if (m >= 60) {
+            m = 0;
+            d += 1;
+        }
+
+        const paddedM = String(m).padStart(2, '0');
+        const paddedS = parseFloat(sStr) < 10 ? `0${sStr}` : sStr;
+        return `${d}°${paddedM}'${paddedS}"${dir}`;
+    };
+
+    return `${toDMS(latNum, true)} ${toDMS(lonNum, false)}`;
+}
+
+window.copyCoordinatesToClipboard = function (text, btnElement) {
+    if (!text || text === 'N/A') return;
+
+    const showSuccess = () => {
+        if (btnElement) {
+            const originalHTML = btnElement.innerHTML;
+            btnElement.innerHTML = `<span style="font-size: 0.85rem; color: #00e676;">✓</span> <span style="font-size: 0.75rem; color: #00e676; font-weight: bold;">Copied!</span>`;
+            btnElement.style.background = 'rgba(0, 230, 118, 0.2)';
+            btnElement.style.borderColor = '#00e676';
+            setTimeout(() => {
+                btnElement.innerHTML = originalHTML;
+                btnElement.style.background = 'rgba(14,165,233,0.18)';
+                btnElement.style.borderColor = 'rgba(14,165,233,0.45)';
+            }, 1800);
+        }
+        if (typeof showToast === 'function') {
+            showToast(`Copied: ${text}`);
+        }
+    };
+
+    const fallbackCopy = (str) => {
+        const el = document.createElement('textarea');
+        el.value = str;
+        el.setAttribute('readonly', '');
+        el.style.position = 'fixed';
+        el.style.left = '-9999px';
+        el.style.top = '-9999px';
+        document.body.appendChild(el);
+        el.select();
+        let success = false;
+        try {
+            success = document.execCommand('copy');
+        } catch (e) {
+            console.error('Copy fallback failed', e);
+        }
+        document.body.removeChild(el);
+        return success;
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(showSuccess).catch(() => {
+            if (fallbackCopy(text)) {
+                showSuccess();
+            } else {
+                window.prompt("Copy coordinates manually:", text);
+            }
+        });
+    } else {
+        if (fallbackCopy(text)) {
+            showSuccess();
+        } else {
+            window.prompt("Copy coordinates manually:", text);
+        }
+    }
+};
+
+window.copyCoordinatesFromBtn = function (btn) {
+    if (!btn) return;
+    const raw = btn.getAttribute('data-coords');
+    const text = decodeURIComponent(raw || '');
+    window.copyCoordinatesToClipboard(text, btn);
+};
 
 async function recordGPSTrack(userId, actionType) {
     if (!db || !userId) return;
@@ -1610,13 +1879,16 @@ async function recordGPSTrack(userId, actionType) {
         const loc = await getGPSLocation();
         const dt = formatFullDateTime(new Date());
         const locationName = await getNearbyLocationName(loc.latitude, loc.longitude);
+        const dmsString = (loc.latitude && loc.longitude && loc.latitude !== "Unavailable") ? convertToDMS(loc.latitude, loc.longitude) : "N/A";
 
         const newEntry = {
             userId: userId,
             action: type,
             latitude: loc.latitude,
             longitude: loc.longitude,
+            dmsCoordinates: dmsString,
             locationName: locationName,
+            deviceIp: loc.deviceIp || "Auto-Recognized",
             date: dt.date,
             time: dt.time,
             fullFormat: dt.fullFormat,
@@ -9976,7 +10248,160 @@ window.openGPSTrackModal = function () {
         modal.className = 'modal-overlay';
         modal.style.cssText = 'display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10005; align-items: center; justify-content: center; backdrop-filter: blur(6px);';
         modal.innerHTML = `
-            <div class="modal-box" style="background: var(--alpha-card-bg, #1E293B); padding: 22px; border-radius: 16px; width: 95%; max-width: 680px; color: var(--alpha-text, white); display: flex; flex-direction: column; gap: 14px; border: 1px solid var(--alpha-border, rgba(255,255,255,0.1)); box-shadow: 0 16px 40px rgba(0,0,0,0.6); max-height: 88vh;">
+            <style>
+                .gps-custom-select-wrapper {
+                    position: relative;
+                    width: 100%;
+                }
+                .gps-dropdown-trigger {
+                    width: 100%;
+                    padding: 10px 12px;
+                    background: rgba(15, 23, 42, 0.85);
+                    color: var(--alpha-text, white);
+                    border: 1px solid var(--alpha-border, rgba(255, 255, 255, 0.18));
+                    border-radius: 8px;
+                    font-size: 0.86rem;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    cursor: pointer;
+                    box-sizing: border-box;
+                    transition: all 0.2s;
+                    user-select: none;
+                }
+                .gps-dropdown-trigger:hover {
+                    border-color: #0EA5E9;
+                    background: rgba(15, 23, 42, 0.95);
+                }
+                .gps-dropdown-menu {
+                    display: none;
+                    position: absolute;
+                    top: calc(100% + 4px);
+                    left: 0;
+                    width: 100%;
+                    max-height: 156px;
+                    overflow-y: auto;
+                    overflow-x: hidden;
+                    background: #0b1329;
+                    border: 1px solid rgba(14, 165, 233, 0.45);
+                    border-radius: 8px;
+                    z-index: 10025;
+                    box-shadow: 0 12px 30px rgba(0,0,0,0.85);
+                    box-sizing: border-box;
+                    scrollbar-width: thin;
+                    scrollbar-color: #0EA5E9 rgba(255, 255, 255, 0.08);
+                }
+                .gps-dropdown-menu::-webkit-scrollbar {
+                    width: 6px;
+                }
+                .gps-dropdown-menu::-webkit-scrollbar-track {
+                    background: rgba(255, 255, 255, 0.06);
+                    border-radius: 4px;
+                }
+                .gps-dropdown-menu::-webkit-scrollbar-thumb {
+                    background: #0EA5E9;
+                    border-radius: 4px;
+                }
+                .gps-dropdown-menu::-webkit-scrollbar-thumb:hover {
+                    background: #38bdf8;
+                }
+                .gps-dropdown-item {
+                    padding: 9px 12px;
+                    font-size: 0.86rem;
+                    color: var(--alpha-text, white);
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    transition: background 0.15s, color 0.15s;
+                    white-space: nowrap;
+                    height: 38px;
+                    box-sizing: border-box;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+                }
+                .gps-dropdown-item:last-child {
+                    border-bottom: none;
+                }
+                .gps-dropdown-item:hover {
+                    background: rgba(14, 165, 233, 0.22);
+                    color: #38bdf8;
+                }
+                .gps-dropdown-item.active {
+                    background: rgba(14, 165, 233, 0.35);
+                    color: #38bdf8;
+                    font-weight: bold;
+                }
+                #gpsTrackTableWrapper {
+                    flex: 1;
+                    overflow-y: auto;
+                    overflow-x: auto;
+                    -webkit-overflow-scrolling: touch;
+                    max-height: 56vh;
+                    border: 1px solid var(--alpha-border, rgba(255,255,255,0.08));
+                    border-radius: 12px;
+                    background: rgba(0,0,0,0.18);
+                    padding: 12px;
+                    scrollbar-width: thin;
+                    scrollbar-color: #0EA5E9 rgba(255, 255, 255, 0.08);
+                }
+                #gpsTrackTableWrapper::-webkit-scrollbar {
+                    width: 6px;
+                    height: 6px;
+                }
+                #gpsTrackTableWrapper::-webkit-scrollbar-track {
+                    background: rgba(255, 255, 255, 0.06);
+                    border-radius: 4px;
+                }
+                #gpsTrackTableWrapper::-webkit-scrollbar-thumb {
+                    background: #0EA5E9;
+                    border-radius: 4px;
+                }
+                #gpsTrackTableWrapper::-webkit-scrollbar-thumb:hover {
+                    background: #38bdf8;
+                }
+                .gps-detail-card {
+                    background: rgba(255, 255, 255, 0.035);
+                    border: 1px solid var(--alpha-border, rgba(255, 255, 255, 0.1));
+                    border-radius: 12px;
+                    padding: 14px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+                    min-width: 100%;
+                    width: max-content;
+                    box-sizing: border-box;
+                }
+                .gps-detail-row {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    white-space: nowrap;
+                    background: rgba(0, 0, 0, 0.24);
+                    border-radius: 8px;
+                    padding: 9px 14px;
+                    gap: 28px;
+                    min-width: 100%;
+                    box-sizing: border-box;
+                }
+                .gps-detail-label {
+                    opacity: 0.78;
+                    font-size: 0.85rem;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    flex-shrink: 0;
+                    white-space: nowrap;
+                }
+                .gps-detail-value {
+                    font-size: 0.86rem;
+                    font-weight: 600;
+                    text-align: right;
+                    white-space: nowrap;
+                    flex-shrink: 0;
+                }
+            </style>
+            <div class="modal-box" style="background: var(--alpha-card-bg, #1E293B); padding: 20px 16px; border-radius: 16px; width: 95%; max-width: 580px; color: var(--alpha-text, white); display: flex; flex-direction: column; gap: 14px; border: 1px solid var(--alpha-border, rgba(255,255,255,0.1)); box-shadow: 0 16px 40px rgba(0,0,0,0.6); max-height: 90vh; box-sizing: border-box;">
                 <!-- Header -->
                 <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--alpha-border, rgba(255,255,255,0.1)); padding-bottom: 12px;">
                     <div style="display: flex; align-items: center; gap: 8px;">
@@ -9986,43 +10411,45 @@ window.openGPSTrackModal = function () {
                     <button id="closeGpsTrackModalBtn" style="background:none; border:none; color: var(--alpha-text, white); font-size:1.3rem; cursor:pointer; padding: 4px 8px; border-radius: 6px; line-height: 1;">✕</button>
                 </div>
                 
-                <!-- 3 Dropdown Selectors -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; background: rgba(0,0,0,0.22); padding: 12px; border-radius: 12px; border: 1px solid var(--alpha-border, rgba(255,255,255,0.06));">
-                    <!-- 1. Select User (Only users with data in GPS Track Table) -->
-                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                        <label style="font-size: 0.78rem; font-weight: bold; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">👤 Select User</label>
-                        <select id="gpsUserSelect" style="padding: 9px 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.7); color: var(--alpha-text, white); border: 1px solid var(--alpha-border, rgba(255,255,255,0.15)); outline: none; font-size: 0.9rem; cursor: pointer;">
-                            <option value="">Loading users...</option>
-                        </select>
+                <!-- 3 Dropdown Selectors with 4-Row Slider -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; background: rgba(0,0,0,0.22); padding: 10px; border-radius: 12px; border: 1px solid var(--alpha-border, rgba(255,255,255,0.06)); position: relative;">
+                    <!-- 1. Select User -->
+                    <div class="gps-custom-select-wrapper">
+                        <div id="gpsUserTrigger" class="gps-dropdown-trigger">
+                            <span id="gpsUserLabel" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">👤 Select User</span>
+                            <span style="font-size: 0.75rem; opacity: 0.7; margin-left: 6px;">▼</span>
+                        </div>
+                        <div id="gpsUserMenu" class="gps-dropdown-menu"></div>
                     </div>
 
-                    <!-- 2. Select Track Type (Login / Logout) -->
-                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                        <label style="font-size: 0.78rem; font-weight: bold; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">🔄 Track Type</label>
-                        <select id="gpsTypeSelect" style="padding: 9px 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.7); color: var(--alpha-text, white); border: 1px solid var(--alpha-border, rgba(255,255,255,0.15)); outline: none; font-size: 0.9rem; cursor: pointer;">
-                            <option value="Login">🟢 Login Track</option>
-                            <option value="Logout">🔴 Logout Track</option>
-                        </select>
+                    <!-- 2. Select Track Type -->
+                    <div class="gps-custom-select-wrapper">
+                        <div id="gpsTypeTrigger" class="gps-dropdown-trigger">
+                            <span id="gpsTypeLabel" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">🔄 Select Track Type</span>
+                            <span style="font-size: 0.75rem; opacity: 0.7; margin-left: 6px;">▼</span>
+                        </div>
+                        <div id="gpsTypeMenu" class="gps-dropdown-menu">
+                            <div class="gps-dropdown-item" data-val="Login">🟢 Login</div>
+                            <div class="gps-dropdown-item" data-val="Logout">🔴 Logout</div>
+                        </div>
                     </div>
 
-                    <!-- 3. Select Serial (1st, 2nd, ... 10th or All) -->
-                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                        <label style="font-size: 0.78rem; font-weight: bold; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px;">🔢 Serial / Record</label>
-                        <select id="gpsSerialSelect" style="padding: 9px 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.7); color: var(--alpha-text, white); border: 1px solid var(--alpha-border, rgba(255,255,255,0.15)); outline: none; font-size: 0.9rem; cursor: pointer;">
-                            <option value="ALL">📋 All Records (1st - 10th)</option>
-                        </select>
+                    <!-- 3. Select Record (Max 4 rows visible with slider) -->
+                    <div class="gps-custom-select-wrapper">
+                        <div id="gpsSerialTrigger" class="gps-dropdown-trigger">
+                            <span id="gpsSerialLabel" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">🔢 Select Record</span>
+                            <span style="font-size: 0.75rem; opacity: 0.7; margin-left: 6px;">▼</span>
+                        </div>
+                        <div id="gpsSerialMenu" class="gps-dropdown-menu"></div>
                     </div>
                 </div>
 
-                <!-- Scrollable Table Wrapper -->
-                <div id="gpsTrackTableWrapper" style="flex: 1; overflow-x: auto; overflow-y: auto; max-height: 48vh; border: 1px solid var(--alpha-border, rgba(255,255,255,0.08)); border-radius: 12px; background: rgba(0,0,0,0.18); padding: 12px;">
-                    <div style="text-align: center; padding: 25px; opacity: 0.6;">Select a user to display GPS records.</div>
-                </div>
-
-                <!-- Bottom Action Bar with Map Button -->
-                <div id="gpsBottomActionBar" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--alpha-border, rgba(255,255,255,0.1)); padding-top: 10px; min-height: 44px;">
-                    <div id="gpsStatusSummary" style="font-size: 0.82rem; opacity: 0.7;"></div>
-                    <div id="gpsMapButtonContainer"></div>
+                <!-- Single Column Scrollable Data Container (Displays 1 record at a time with auto-extending width & horizontal slider) -->
+                <div id="gpsTrackTableWrapper">
+                    <div style="text-align: center; padding: 30px 15px; opacity: 0.65; font-size: 0.9rem;">
+                        <div style="font-size: 2rem; margin-bottom: 8px;">📍</div>
+                        Please select <b>User</b>, <b>Track Type</b>, and <b>Record</b> above to view details.
+                    </div>
                 </div>
             </div>
         `;
@@ -10037,24 +10464,87 @@ window.openGPSTrackModal = function () {
                 window._gpsTrackListenerRef = null;
             }
         };
+
+        // Close dropdowns on outside click
+        modal.addEventListener('click', (e) => {
+            if (!e.target.closest('.gps-custom-select-wrapper')) {
+                closeAllGpsDropdowns();
+            }
+        });
     }
 
-    const userSelect = document.getElementById('gpsUserSelect');
-    const typeSelect = document.getElementById('gpsTypeSelect');
-    const serialSelect = document.getElementById('gpsSerialSelect');
-    const tableWrapper = document.getElementById('gpsTrackTableWrapper');
-    const summaryEl = document.getElementById('gpsStatusSummary');
-    const mapBtnContainer = document.getElementById('gpsMapButtonContainer');
+    const userTrigger = document.getElementById('gpsUserTrigger');
+    const userLabel = document.getElementById('gpsUserLabel');
+    const userMenu = document.getElementById('gpsUserMenu');
 
+    const typeTrigger = document.getElementById('gpsTypeTrigger');
+    const typeLabel = document.getElementById('gpsTypeLabel');
+    const typeMenu = document.getElementById('gpsTypeMenu');
+
+    const serialTrigger = document.getElementById('gpsSerialTrigger');
+    const serialLabel = document.getElementById('gpsSerialLabel');
+    const serialMenu = document.getElementById('gpsSerialMenu');
+
+    const tableWrapper = document.getElementById('gpsTrackTableWrapper');
+
+    let selectedUser = "";
+    let selectedType = "";
+    let selectedSerial = "";
     let currentTrackData = {};
 
-    // 1. Populate ONLY users who have records in GPS Track Table
+    const closeAllGpsDropdowns = () => {
+        userMenu.style.display = 'none';
+        typeMenu.style.display = 'none';
+        serialMenu.style.display = 'none';
+    };
+
+    // Toggle dropdowns
+    userTrigger.onclick = (e) => {
+        e.stopPropagation();
+        const isOpen = userMenu.style.display === 'block';
+        closeAllGpsDropdowns();
+        userMenu.style.display = isOpen ? 'none' : 'block';
+    };
+
+    typeTrigger.onclick = (e) => {
+        e.stopPropagation();
+        const isOpen = typeMenu.style.display === 'block';
+        closeAllGpsDropdowns();
+        typeMenu.style.display = isOpen ? 'none' : 'block';
+    };
+
+    serialTrigger.onclick = (e) => {
+        e.stopPropagation();
+        const isOpen = serialMenu.style.display === 'block';
+        closeAllGpsDropdowns();
+        serialMenu.style.display = isOpen ? 'none' : 'block';
+    };
+
+    // 1. Populate Users in Dropdown Menu
     const loadUsersWithGPS = () => {
         if (!db) return;
+        selectedUser = "";
+        selectedType = "";
+        selectedSerial = "";
+        currentTrackData = {};
+
+        userLabel.textContent = "👤 Select User";
+        typeLabel.textContent = "🔄 Select Track Type";
+        serialLabel.textContent = "🔢 Select Record";
+
+        userMenu.innerHTML = '<div style="padding: 10px; font-size: 0.85rem; opacity: 0.6; text-align: center;">Loading users...</div>';
+        serialMenu.innerHTML = '<div style="padding: 10px; font-size: 0.85rem; opacity: 0.6; text-align: center;">Select User & Type first</div>';
+
+        tableWrapper.innerHTML = `
+            <div style="text-align: center; padding: 30px 15px; opacity: 0.65; font-size: 0.9rem;">
+                <div style="font-size: 2rem; margin-bottom: 8px;">📍</div>
+                Please select <b>User</b>, <b>Track Type</b>, and <b>Record</b> above to view details.
+            </div>
+        `;
+
         db.ref('GPS Track Table').once('value').then(snap => {
-            userSelect.innerHTML = '';
             if (!snap.exists() || !snap.val()) {
-                userSelect.innerHTML = '<option value="">No GPS Track data available</option>';
+                userMenu.innerHTML = '<div style="padding: 10px; font-size: 0.85rem; opacity: 0.6; text-align: center;">No GPS Track data</div>';
                 tableWrapper.innerHTML = `
                     <div style="text-align:center; padding: 30px; opacity: 0.7;">
                         <div style="font-size: 2.2rem; margin-bottom: 8px;">🗺️</div>
@@ -10062,262 +10552,279 @@ window.openGPSTrackModal = function () {
                         <div style="font-size: 0.85rem; opacity: 0.6; margin-top: 4px;">Locations will automatically appear here once users login or logout.</div>
                     </div>
                 `;
-                summaryEl.innerText = '0 users found';
-                mapBtnContainer.innerHTML = '';
                 return;
             }
 
             const data = snap.val();
             const userKeys = Object.keys(data);
+            userMenu.innerHTML = '';
 
             userKeys.forEach(uKey => {
-                const opt = document.createElement('option');
-                opt.value = uKey;
-                opt.textContent = `${uKey}`;
-                userSelect.appendChild(opt);
+                const item = document.createElement('div');
+                item.className = 'gps-dropdown-item';
+                item.textContent = `👤 ${uKey}`;
+                item.onclick = (e) => {
+                    e.stopPropagation();
+                    selectedUser = uKey;
+                    userLabel.textContent = `👤 ${uKey}`;
+                    closeAllGpsDropdowns();
+                    loadTrackDetails();
+                };
+                userMenu.appendChild(item);
             });
-
-            // Auto-select first user and load their track data
-            if (userKeys.length > 0) {
-                userSelect.value = userKeys[0];
-                loadTrackDetails();
-            }
         });
     };
 
-    // 2. Load Track Data for Selected User and Type
-    const loadTrackDetails = () => {
-        const selectedUser = userSelect.value;
-        const selectedType = typeSelect.value;
-        if (!selectedUser || !db) return;
+    // Track Type Click Handlers
+    typeMenu.querySelectorAll('.gps-dropdown-item').forEach(item => {
+        item.onclick = (e) => {
+            e.stopPropagation();
+            selectedType = item.getAttribute('data-val');
+            typeLabel.textContent = selectedType === 'Login' ? '🟢 Login' : '🔴 Logout';
+            closeAllGpsDropdowns();
+            loadTrackDetails();
+        };
+    });
 
+    // 2. Load Track Data for Selected User & Type
+    const loadTrackDetails = () => {
         if (window._gpsTrackListenerRef) {
             window._gpsTrackListenerRef.off();
+        }
+
+        selectedSerial = "";
+        serialLabel.textContent = "🔢 Select Record";
+
+        if (!selectedUser || !selectedType || !db) {
+            currentTrackData = {};
+            serialMenu.innerHTML = '<div style="padding: 10px; font-size: 0.85rem; opacity: 0.6; text-align: center;">Select User & Type first</div>';
+            tableWrapper.innerHTML = `
+                <div style="text-align: center; padding: 30px 15px; opacity: 0.65; font-size: 0.9rem;">
+                    <div style="font-size: 2rem; margin-bottom: 8px;">📍</div>
+                    Please select <b>${!selectedUser ? 'User' : 'Track Type and Record'}</b> above to view details.
+                </div>
+            `;
+            return;
         }
 
         window._gpsTrackListenerRef = db.ref(`GPS Track Table/${selectedUser}/${selectedType}`);
         window._gpsTrackListenerRef.on('value', snap => {
             currentTrackData = snap.exists() ? (snap.val() || {}) : {};
-            updateSerialDropdown();
-            renderTableView();
+            updateRecordDropdownMenu();
+            renderSingleRecordView();
         });
     };
 
-    // 3. Update Serial Dropdown based on Available Keys (1st, 2nd, ... 10th)
-    const updateSerialDropdown = () => {
-        const currentSerialVal = serialSelect.value;
-        serialSelect.innerHTML = '<option value="ALL">📋 All Records (1st - 10th)</option>';
-
+    // 3. Update Record Dropdown Menu (Max 4 items visible with slider)
+    const updateRecordDropdownMenu = () => {
+        serialMenu.innerHTML = '';
         const keys = Object.keys(currentTrackData);
-        if (keys.length === 0) return;
 
-        // Custom comparator for serials: 1st, 2nd, 3rd...
+        if (keys.length === 0) {
+            serialMenu.innerHTML = `<div style="padding: 10px; font-size: 0.85rem; opacity: 0.6; text-align: center;">No ${selectedType} records</div>`;
+            return;
+        }
+
+        // Sort keys numerically (1st, 2nd, ... 10th)
         const parseSerialNum = (s) => parseInt(s.replace(/\D/g, '')) || 0;
         keys.sort((a, b) => parseSerialNum(a) - parseSerialNum(b));
 
         keys.forEach(k => {
-            const opt = document.createElement('option');
-            opt.value = k;
-            opt.textContent = `📍 Record ${k}`;
-            serialSelect.appendChild(opt);
+            const item = document.createElement('div');
+            item.className = 'gps-dropdown-item';
+            if (selectedSerial === k) item.classList.add('active');
+            item.innerHTML = `<span>📍 Record ${k}</span><span style="font-size: 0.75rem; opacity: 0.5;">${currentTrackData[k]?.time || ''}</span>`;
+            item.onclick = (e) => {
+                e.stopPropagation();
+                selectedSerial = k;
+                serialLabel.textContent = `📍 Record ${k}`;
+                closeAllGpsDropdowns();
+                renderSingleRecordView();
+            };
+            serialMenu.appendChild(item);
         });
-
-        // Restore selected serial if still valid, otherwise ALL
-        if (keys.includes(currentSerialVal)) {
-            serialSelect.value = currentSerialVal;
-        } else {
-            serialSelect.value = "ALL";
-        }
     };
 
-    // 4. Render Table in Column Form (Scrollable)
-    const renderTableView = () => {
-        const selectedUser = userSelect.value;
-        const selectedType = typeSelect.value;
-        const selectedSerial = serialSelect.value;
+    // Helper: Render Single Record Card with all details strictly in single-line rows
+    const createSingleRecordCardHTML = (serial, rec, isLogin, user) => {
+        const lat = rec.latitude ?? rec.lattitude ?? "N/A";
+        const lon = rec.longitude ?? rec.lontitude ?? "N/A";
+        const hasCoords = lat !== "N/A" && lon !== "N/A" && lat !== "Unavailable" && lon !== "Unavailable";
+        
+        let mapsUrl = '#';
+        if (hasCoords) {
+            const locName = (rec.locationName && rec.locationName !== 'N/A' && rec.locationName !== 'Location Unknown' && rec.locationName !== 'Location Unavailable') ? rec.locationName : '';
+            if (locName) {
+                const cleanPlace = locName.replace(/^Near\s+/i, '').replace(/\s*\([^)]*\)/g, '').trim();
+                mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cleanPlace || `${lat},${lon}`)}`;
+            } else {
+                mapsUrl = `https://www.google.com/maps?q=${lat},${lon}`;
+            }
+        }
+        const dmsString = (rec.dmsCoordinates && rec.dmsCoordinates !== 'N/A') ? rec.dmsCoordinates : (hasCoords ? convertToDMS(lat, lon) : 'N/A');
 
+        return `
+            <div class="gps-detail-card">
+                <!-- Row 1: Serial Record -->
+                <div class="gps-detail-row">
+                    <span class="gps-detail-label">🔢 Serial Record</span>
+                    <span class="gps-detail-value" style="background: #0EA5E9; color: white; padding: 3px 12px; border-radius: 6px; font-weight: bold; font-size: 0.85rem;">${serial}</span>
+                </div>
+
+                <!-- Row 2: Track Action -->
+                <div class="gps-detail-row">
+                    <span class="gps-detail-label">🔄 Track Action</span>
+                    <span class="gps-detail-value" style="background: ${isLogin ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.15)'}; border: 1px solid ${isLogin ? '#2ecc71' : '#e74c3c'}; color: ${isLogin ? '#2ecc71' : '#ff7675'}; padding: 3px 10px; border-radius: 6px; font-weight: bold; font-size: 0.82rem;">
+                        ${isLogin ? '🟢 Login' : '🔴 Logout'}
+                    </span>
+                </div>
+
+                <!-- Row 3: User ID -->
+                <div class="gps-detail-row">
+                    <span class="gps-detail-label">👤 User ID</span>
+                    <span class="gps-detail-value" style="font-weight: bold; font-size: 0.88rem;">${rec.userId || user}</span>
+                </div>
+
+                <!-- Row 4: Place / Locality -->
+                <div class="gps-detail-row">
+                    <span class="gps-detail-label">🏷️ Place / Locality</span>
+                    <span class="gps-detail-value gps-place-value" style="color: #4ade80; font-weight: 600;">${rec.locationName || 'N/A'}</span>
+                </div>
+
+                <!-- Row 5: GPS DMS Coordinates with Copy Button -->
+                <div class="gps-detail-row" style="background: rgba(14, 165, 233, 0.09); border: 1px solid rgba(14, 165, 233, 0.3);">
+                    <div style="display: flex; align-items: center; gap: 8px; white-space: nowrap; flex-shrink: 0;">
+                        <span style="opacity: 0.8; font-size: 0.78rem; text-transform: uppercase;">🌐 GPS DMS</span>
+                        <span style="font-family: monospace; color: #38bdf8; font-weight: bold; font-size: 0.88rem;">${dmsString}</span>
+                    </div>
+                    ${dmsString !== 'N/A' ? `
+                        <button type="button" onclick="copyCoordinatesFromBtn(this)" data-coords="${encodeURIComponent(dmsString)}" title="Copy GPS Coordinates" style="background: rgba(14,165,233,0.18); border: 1px solid rgba(14,165,233,0.45); color: #38bdf8; padding: 5px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.8rem; font-weight: bold; flex-shrink: 0; white-space: nowrap; transition: all 0.2s;">
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                            <span>Copy</span>
+                        </button>
+                    ` : ''}
+                </div>
+
+                <!-- Row 6: Date -->
+                <div class="gps-detail-row">
+                    <span class="gps-detail-label">📅 Date</span>
+                    <span class="gps-detail-value" style="font-weight: bold;">${rec.date || 'N/A'}</span>
+                </div>
+
+                <!-- Row 7: Time -->
+                <div class="gps-detail-row">
+                    <span class="gps-detail-label">⏰ Time</span>
+                    <span class="gps-detail-value" style="font-weight: bold;">${rec.time || 'N/A'}</span>
+                </div>
+
+                <!-- Row 8: Latitude -->
+                <div class="gps-detail-row">
+                    <span class="gps-detail-label">📍 Latitude</span>
+                    <span class="gps-detail-value" style="font-family: monospace; color: #38bdf8; font-weight: bold;">${lat}</span>
+                </div>
+
+                <!-- Row 9: Longitude -->
+                <div class="gps-detail-row">
+                    <span class="gps-detail-label">📍 Longitude</span>
+                    <span class="gps-detail-value" style="font-family: monospace; color: #38bdf8; font-weight: bold;">${lon}</span>
+                </div>
+
+                <!-- Row 10: Full Timestamp -->
+                <div class="gps-detail-row">
+                    <span class="gps-detail-label">⏱️ Full Timestamp</span>
+                    <span class="gps-detail-value" style="opacity: 0.95;">${rec.fullFormat || 'N/A'}</span>
+                </div>
+
+                <!-- Row 11: Device IP -->
+                <div class="gps-detail-row">
+                    <span class="gps-detail-label">💻 Device IP</span>
+                    <span class="gps-detail-value" style="font-family: monospace; color: #38bdf8; font-weight: bold;">${rec.deviceIp || 'Auto-Recognized'}</span>
+                </div>
+
+                <!-- Row 12: Source / Accuracy -->
+                <div class="gps-detail-row">
+                    <span class="gps-detail-label">📡 Source / Accuracy</span>
+                    <span class="gps-detail-value" style="opacity: 0.9;">${rec.source || 'GPS/Device'} ${rec.accuracy ? `(±${Math.round(rec.accuracy)}m)` : ''}</span>
+                </div>
+
+                <!-- Row 13: Dedicated Single-Line Map Button -->
+                ${hasCoords ? `
+                    <div style="min-width: 100%; width: 100%; margin-top: 4px; box-sizing: border-box;">
+                        <a href="${mapsUrl}" class="gps-map-btn" target="_blank" rel="noopener noreferrer" style="display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, #0EA5E9, #2563EB); color: white; padding: 11px 16px; border-radius: 9px; text-decoration: none; font-size: 0.9rem; font-weight: bold; width: 100%; box-shadow: 0 4px 12px rgba(14,165,233,0.35); transition: transform 0.2s; white-space: nowrap; box-sizing: border-box;">
+                            📍 View GPS in Map (${serial})
+                        </a>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    };
+
+    // 4. Render exactly 1 selected record in table wrapper
+    const renderSingleRecordView = () => {
         tableWrapper.innerHTML = '';
-        mapBtnContainer.innerHTML = '';
 
-        if (!selectedUser || Object.keys(currentTrackData).length === 0) {
+        if (!selectedUser || !selectedType) {
             tableWrapper.innerHTML = `
-                <div style="text-align:center; padding: 35px 15px; opacity: 0.7;">
-                    <div style="font-size: 2.2rem; margin-bottom: 8px;">🗺️</div>
-                    <div style="font-weight: bold; font-size: 1rem;">No ${selectedType} records for ${selectedUser}</div>
-                    <div style="font-size: 0.82rem; opacity: 0.5; margin-top: 4px;">Data is recorded upon user ${selectedType.toLowerCase()}.</div>
+                <div style="text-align: center; padding: 30px 15px; opacity: 0.65; font-size: 0.9rem;">
+                    <div style="font-size: 2rem; margin-bottom: 8px;">📍</div>
+                    Please select <b>User</b> and <b>Track Type</b> above.
                 </div>
             `;
-            summaryEl.innerText = `0 ${selectedType} records`;
             return;
         }
 
-        const parseSerialNum = (s) => parseInt(s.replace(/\D/g, '')) || 0;
-        let records = [];
+        const keys = Object.keys(currentTrackData);
+        if (keys.length === 0) {
+            tableWrapper.innerHTML = `
+                <div style="text-align:center; padding: 30px 15px; opacity: 0.7;">
+                    <div style="font-size: 2.2rem; margin-bottom: 8px;">🗺️</div>
+                    <div style="font-weight: bold; font-size: 1rem;">No ${selectedType} records found for ${selectedUser}</div>
+                    <div style="font-size: 0.82rem; opacity: 0.5; margin-top: 4px;">Data is automatically recorded upon user ${selectedType.toLowerCase()}.</div>
+                </div>
+            `;
+            return;
+        }
 
-        if (selectedSerial === "ALL") {
-            Object.keys(currentTrackData).forEach(k => {
-                const item = currentTrackData[k];
-                if (item && typeof item === 'object') {
-                    records.push({ serialKey: k, ...item });
+        if (!selectedSerial) {
+            tableWrapper.innerHTML = `
+                <div style="text-align: center; padding: 30px 15px; opacity: 0.65; font-size: 0.9rem;">
+                    <div style="font-size: 2rem; margin-bottom: 8px;">🔢</div>
+                    Please select a <b>Record (${keys.join(', ')})</b> from the Record dropdown above.
+                </div>
+            `;
+            return;
+        }
+
+        const rec = currentTrackData[selectedSerial];
+        if (!rec) {
+            tableWrapper.innerHTML = `<div style="text-align:center; padding: 25px; opacity: 0.6;">No data found for record ${selectedSerial}.</div>`;
+            return;
+        }
+
+        const isLogin = selectedType === 'Login';
+        tableWrapper.innerHTML = createSingleRecordCardHTML(selectedSerial, rec, isLogin, selectedUser);
+
+        // Enhance location with nearest marked landmark (within <= 80m) if not already populated with a landmark
+        const lat = rec.latitude ?? rec.lattitude;
+        const lon = rec.longitude ?? rec.lontitude;
+        if (lat && lon && lat !== "Unavailable" && lon !== "Unavailable" && (!rec.locationName || !rec.locationName.startsWith('Near '))) {
+            getNearbyLocationName(lat, lon).then(enhancedPlace => {
+                if (enhancedPlace && enhancedPlace !== "Location Unknown" && enhancedPlace !== "Location Unavailable") {
+                    const placeValEl = tableWrapper.querySelector('.gps-place-value');
+                    if (placeValEl) {
+                        placeValEl.textContent = enhancedPlace;
+                    }
+                    const mapBtnEl = tableWrapper.querySelector('.gps-map-btn');
+                    if (mapBtnEl) {
+                        const cleanPlace = enhancedPlace.replace(/^Near\s+/i, '').trim();
+                        mapBtnEl.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cleanPlace)}`;
+                    }
+                    if (db && selectedUser && selectedType && selectedSerial) {
+                        db.ref(`GPS Track Table/${selectedUser}/${selectedType}/${selectedSerial}/locationName`).set(enhancedPlace).catch(() => {});
+                    }
                 }
             });
-            records.sort((a, b) => parseSerialNum(a.serialKey) - parseSerialNum(b.serialKey));
-        } else {
-            if (currentTrackData[selectedSerial]) {
-                records.push({ serialKey: selectedSerial, ...currentTrackData[selectedSerial] });
-            }
         }
-
-        summaryEl.innerText = `Showing ${records.length} of ${Object.keys(currentTrackData).length} ${selectedType} records for ${selectedUser}`;
-
-        if (records.length === 0) {
-            tableWrapper.innerHTML = `<div style="text-align:center; padding: 25px; opacity: 0.6;">No data for selected record.</div>`;
-            return;
-        }
-
-        // Mode A: Single Serial Record -> Clean Detailed Column-Form Table
-        if (selectedSerial !== "ALL" && records.length === 1) {
-            const rec = records[0];
-            const lat = rec.latitude ?? rec.lattitude ?? "N/A";
-            const lon = rec.longitude ?? rec.lontitude ?? "N/A";
-            const hasCoords = lat !== "N/A" && lon !== "N/A" && lat !== "Unavailable" && lon !== "Unavailable";
-            const mapsUrl = hasCoords ? `https://www.google.com/maps?q=${lat},${lon}` : '#';
-            const isLogin = selectedType === 'Login';
-
-            tableWrapper.innerHTML = `
-                <table style="width: 100%; min-width: 480px; border-collapse: collapse; font-size: 0.88rem; color: var(--alpha-text, white);">
-                    <tbody>
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                            <td style="padding: 10px 14px; font-weight: bold; width: 140px; color: #38bdf8; background: rgba(255,255,255,0.02);">Serial & Action</td>
-                            <td style="padding: 10px 14px;">
-                                <span style="background: #0EA5E9; color: white; padding: 2px 8px; border-radius: 6px; font-weight: bold; font-size: 0.8rem; margin-right: 6px;">${rec.serialKey}</span>
-                                <span style="background: ${isLogin ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.15)'}; border: 1px solid ${isLogin ? '#2ecc71' : '#e74c3c'}; color: ${isLogin ? '#2ecc71' : '#ff7675'}; padding: 2px 8px; border-radius: 6px; font-weight: bold; font-size: 0.78rem;">
-                                    ${isLogin ? '🟢 Login' : '🔴 Logout'}
-                                </span>
-                            </td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                            <td style="padding: 10px 14px; font-weight: bold; color: #38bdf8; background: rgba(255,255,255,0.02);">User ID</td>
-                            <td style="padding: 10px 14px; font-weight: bold;">${rec.userId || selectedUser}</td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                            <td style="padding: 10px 14px; font-weight: bold; color: #38bdf8; background: rgba(255,255,255,0.02);">🏷️ Place / Locality</td>
-                            <td style="padding: 10px 14px; color: #4ade80; font-weight: 600;">${rec.locationName || 'N/A'}</td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                            <td style="padding: 10px 14px; font-weight: bold; color: #38bdf8; background: rgba(255,255,255,0.02);">📅 Date</td>
-                            <td style="padding: 10px 14px;"><b>${rec.date || 'N/A'}</b></td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                            <td style="padding: 10px 14px; font-weight: bold; color: #38bdf8; background: rgba(255,255,255,0.02);">⏰ Time</td>
-                            <td style="padding: 10px 14px;"><b>${rec.time || 'N/A'}</b></td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                            <td style="padding: 10px 14px; font-weight: bold; color: #38bdf8; background: rgba(255,255,255,0.02);">📍 Latitude</td>
-                            <td style="padding: 10px 14px; font-family: monospace; color: #38bdf8;">${lat}</td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                            <td style="padding: 10px 14px; font-weight: bold; color: #38bdf8; background: rgba(255,255,255,0.02);">📍 Longitude</td>
-                            <td style="padding: 10px 14px; font-family: monospace; color: #38bdf8;">${lon}</td>
-                        </tr>
-                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-                            <td style="padding: 10px 14px; font-weight: bold; color: #38bdf8; background: rgba(255,255,255,0.02);">⏱️ Full Timestamp</td>
-                            <td style="padding: 10px 14px; font-size: 0.82rem; opacity: 0.85;">${rec.fullFormat || 'N/A'}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px 14px; font-weight: bold; color: #38bdf8; background: rgba(255,255,255,0.02);">📡 Accuracy / Source</td>
-                            <td style="padding: 10px 14px; font-size: 0.82rem; opacity: 0.85;">${rec.source || 'GPS/Device'} ${rec.accuracy ? `(±${Math.round(rec.accuracy)}m)` : ''}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            `;
-
-            if (hasCoords) {
-                mapBtnContainer.innerHTML = `
-                    <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #0EA5E9, #2563EB); color: white; padding: 10px 18px; border-radius: 10px; text-decoration: none; font-size: 0.92rem; font-weight: bold; box-shadow: 0 4px 14px rgba(14,165,233,0.4); transition: transform 0.2s;">
-                        📍 View GPS in Map (${rec.serialKey})
-                    </a>
-                `;
-            }
-        } 
-        // Mode B: ALL Records -> Multi-Column Scrollable Table
-        else {
-            let tableHtml = `
-                <table style="width: 100%; min-width: 680px; border-collapse: collapse; font-size: 0.84rem; text-align: left; color: var(--alpha-text, white);">
-                    <thead>
-                        <tr style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border-bottom: 2px solid rgba(14, 165, 233, 0.3);">
-                            <th style="padding: 10px 8px; white-space: nowrap;">Serial</th>
-                            <th style="padding: 10px 8px; white-space: nowrap;">Type</th>
-                            <th style="padding: 10px 8px; min-width: 140px;">Place / Landmark</th>
-                            <th style="padding: 10px 8px; white-space: nowrap;">Date</th>
-                            <th style="padding: 10px 8px; white-space: nowrap;">Time</th>
-                            <th style="padding: 10px 8px; white-space: nowrap;">Latitude</th>
-                            <th style="padding: 10px 8px; white-space: nowrap;">Longitude</th>
-                            <th style="padding: 10px 8px; text-align: center; white-space: nowrap;">Map Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-
-            records.forEach(rec => {
-                const lat = rec.latitude ?? rec.lattitude ?? "N/A";
-                const lon = rec.longitude ?? rec.lontitude ?? "N/A";
-                const hasCoords = lat !== "N/A" && lon !== "N/A" && lat !== "Unavailable" && lon !== "Unavailable";
-                const mapsUrl = hasCoords ? `https://www.google.com/maps?q=${lat},${lon}` : '#';
-                const isLogin = selectedType === 'Login';
-
-                tableHtml += `
-                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.15s ease;" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background='transparent'">
-                        <td style="padding: 9px 8px;"><span style="background: #0EA5E9; color: white; padding: 2px 7px; border-radius: 5px; font-weight: bold; font-size: 0.76rem;">${rec.serialKey}</span></td>
-                        <td style="padding: 9px 8px;"><span style="color: ${isLogin ? '#2ecc71' : '#ff7675'}; font-weight: bold; font-size: 0.78rem;">${isLogin ? '🟢 Login' : '🔴 Logout'}</span></td>
-                        <td style="padding: 9px 8px; color: #4ade80; font-weight: 500;">${rec.locationName || 'N/A'}</td>
-                        <td style="padding: 9px 8px; font-weight: 600; white-space: nowrap;">${rec.date || 'N/A'}</td>
-                        <td style="padding: 9px 8px; white-space: nowrap;">${rec.time || 'N/A'}</td>
-                        <td style="padding: 9px 8px; font-family: monospace; color: #38bdf8; white-space: nowrap;">${lat}</td>
-                        <td style="padding: 9px 8px; font-family: monospace; color: #38bdf8; white-space: nowrap;">${lon}</td>
-                        <td style="padding: 9px 8px; text-align: center; white-space: nowrap;">
-                            ${hasCoords ? `
-                                <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 3px; background: rgba(14, 165, 233, 0.2); border: 1px solid #0EA5E9; color: #38bdf8; padding: 4px 9px; border-radius: 6px; text-decoration: none; font-size: 0.75rem; font-weight: bold;">
-                                    📍 Map
-                                </a>
-                            ` : `<span style="font-size: 0.72rem; opacity: 0.4;">No GPS</span>`}
-                        </td>
-                    </tr>
-                `;
-            });
-
-            tableHtml += `
-                    </tbody>
-                </table>
-            `;
-
-            tableWrapper.innerHTML = tableHtml;
-
-            // In ALL mode, provide map button for the latest record
-            const latestRec = records[records.length - 1];
-            const lat = latestRec?.latitude ?? latestRec?.lattitude;
-            const lon = latestRec?.longitude ?? latestRec?.lontitude;
-            if (lat && lon && lat !== "Unavailable" && lon !== "Unavailable") {
-                mapBtnContainer.innerHTML = `
-                    <a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #0EA5E9, #2563EB); color: white; padding: 10px 18px; border-radius: 10px; text-decoration: none; font-size: 0.92rem; font-weight: bold; box-shadow: 0 4px 14px rgba(14,165,233,0.4); transition: transform 0.2s;">
-                        📍 View GPS in Map (${latestRec.serialKey})
-                    </a>
-                `;
-            }
-        }
-    };
-
-    // Event Listeners for Dynamic Selection Flow
-    userSelect.onchange = () => {
-        loadTrackDetails();
-    };
-
-    typeSelect.onchange = () => {
-        loadTrackDetails();
-    };
-
-    serialSelect.onchange = () => {
-        renderTableView();
     };
 
     modal.style.display = 'flex';
