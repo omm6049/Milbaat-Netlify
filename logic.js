@@ -1483,6 +1483,93 @@ function formatFullDateTime(d = new Date()) {
     };
 }
 
+let primedGPSPromise = null;
+let primedGPSResult = null;
+
+function primeGPSLocation() {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return null;
+    if (primedGPSPromise) return primedGPSPromise;
+
+    console.log("📍 [GPS Track] Priming high-accuracy GPS hardware on user interaction...");
+
+    primedGPSPromise = new Promise((resolve) => {
+        let isResolved = false;
+        let bestPosition = null;
+        let watchId = null;
+
+        const cleanup = () => {
+            if (watchId !== null && navigator.geolocation && navigator.geolocation.clearWatch) {
+                try { navigator.geolocation.clearWatch(watchId); } catch (e) {}
+                watchId = null;
+            }
+        };
+
+        const finish = (pos) => {
+            if (isResolved) return;
+            isResolved = true;
+            cleanup();
+            if (pos && pos.coords) {
+                primedGPSResult = pos;
+            }
+            resolve(pos || bestPosition);
+        };
+
+        // Allow up to 10 seconds for initial satellite acquisition
+        const timer = setTimeout(() => {
+            finish(bestPosition);
+        }, 10000);
+
+        try {
+            // 1. Immediate getCurrentPosition
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    const acc = pos && pos.coords && pos.coords.accuracy;
+                    if (!bestPosition || (acc && acc < (bestPosition.coords.accuracy || Infinity))) {
+                        bestPosition = pos;
+                    }
+                    if (acc && acc <= 25) {
+                        clearTimeout(timer);
+                        finish(pos);
+                    }
+                },
+                (err) => {
+                    if (err.code === err.PERMISSION_DENIED) {
+                        clearTimeout(timer);
+                        finish(null);
+                    }
+                },
+                { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+            );
+
+            // 2. Active watchPosition to catch higher precision
+            watchId = navigator.geolocation.watchPosition(
+                (pos) => {
+                    const acc = pos && pos.coords && pos.coords.accuracy;
+                    if (!bestPosition || (acc && acc < (bestPosition.coords.accuracy || Infinity))) {
+                        bestPosition = pos;
+                    }
+                    if (acc && acc <= 20) {
+                        clearTimeout(timer);
+                        finish(pos);
+                    }
+                },
+                (err) => {
+                    if (err.code === err.PERMISSION_DENIED) {
+                        clearTimeout(timer);
+                        finish(null);
+                    }
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        } catch (e) {
+            clearTimeout(timer);
+            finish(null);
+        }
+    });
+
+    return primedGPSPromise;
+}
+
 async function fetchIPLocationFallback() {
     // 1. Primary: ipwho.is (provides IP, lat/lon, ISP, City, Region)
     try {
@@ -1495,7 +1582,7 @@ async function fetchIPLocationFallback() {
                     longitude: data.longitude,
                     accuracy: null,
                     deviceIp: data.ip || "Auto-Recognized",
-                    source: "IP Geolocation"
+                    source: "IP Geolocation (Approx Gateway)"
                 };
             }
         }
@@ -1514,7 +1601,7 @@ async function fetchIPLocationFallback() {
                     longitude: data2.longitude,
                     accuracy: null,
                     deviceIp: data2.ipAddress || "Auto-Recognized",
-                    source: "IP Geolocation"
+                    source: "IP Geolocation (Approx Gateway)"
                 };
             }
         }
@@ -1533,7 +1620,7 @@ async function fetchIPLocationFallback() {
                     longitude: data3.longitude,
                     accuracy: null,
                     deviceIp: data3.ip || "Auto-Recognized",
-                    source: "IP Geolocation"
+                    source: "IP Geolocation (Approx Gateway)"
                 };
             }
         }
@@ -1575,83 +1662,37 @@ async function getGPSLocation() {
     let deviceIp = "Auto-Recognized";
     fetch('https://ipwho.is/').then(r => r.json()).then(d => { if (d && d.ip) deviceIp = d.ip; }).catch(() => {});
 
-    return new Promise((resolve) => {
-        let isResolved = false;
-        let bestPosition = null;
-        let watchId = null;
+    // If GPS was already primed or in progress, await primed GPS promise
+    if (!primedGPSPromise) {
+        primeGPSLocation();
+    }
 
-        const cleanup = () => {
-            if (watchId !== null && navigator.geolocation && navigator.geolocation.clearWatch) {
-                navigator.geolocation.clearWatch(watchId);
-                watchId = null;
-            }
-        };
+    try {
+        const pos = await Promise.race([
+            primedGPSPromise,
+            new Promise(r => setTimeout(() => r(null), 10000))
+        ]);
 
-        const finish = (pos) => {
-            if (isResolved) return;
-            isResolved = true;
-            cleanup();
-            if (pos && pos.coords) {
-                console.log(`📍 [GPS Track] Acquired position: lat=${pos.coords.latitude}, lon=${pos.coords.longitude}, accuracy=±${Math.round(pos.coords.accuracy || 0)}m`);
-                resolve({
-                    latitude: pos.coords.latitude,
-                    longitude: pos.coords.longitude,
-                    accuracy: pos.coords.accuracy || null,
-                    deviceIp: deviceIp,
-                    source: "GPS/Device"
-                });
-            } else {
-                console.warn("GPS request timed out or unavailable; auto-recognizing Device IP...");
-                fetchIPLocationFallback().then(resolve);
-            }
-        };
-
-        // Allow up to 5s to acquire best satellite lock (or 8s if permission prompt needed)
-        const timeoutDuration = permissionState === 'granted' ? 5000 : 8000;
-        const timer = setTimeout(() => {
-            if (!isResolved) {
-                if (bestPosition) {
-                    finish(bestPosition);
-                } else {
-                    finish(null);
-                }
-            }
-        }, timeoutDuration);
-
-        try {
-            watchId = navigator.geolocation.watchPosition(
-                (position) => {
-                    if (isResolved) return;
-                    const acc = position.coords.accuracy;
-
-                    // Track best position with lowest accuracy error
-                    if (!bestPosition || (acc && acc < (bestPosition.coords.accuracy || Infinity))) {
-                        bestPosition = position;
-                    }
-
-                    // If high-precision satellite accuracy achieved (<= 25m), resolve immediately!
-                    if (acc && acc <= 25) {
-                        clearTimeout(timer);
-                        finish(position);
-                    }
-                },
-                (error) => {
-                    if (error.code === error.PERMISSION_DENIED) {
-                        clearTimeout(timer);
-                        finish(null);
-                    }
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: timeoutDuration,
-                    maximumAge: 0 // Force fresh satellite/hardware sensor query
-                }
-            );
-        } catch (e) {
-            clearTimeout(timer);
-            finish(null);
+        if (pos && pos.coords) {
+            console.log(`📍 [GPS Track] Acquired GPS position: lat=${pos.coords.latitude}, lon=${pos.coords.longitude}, accuracy=±${Math.round(pos.coords.accuracy || 0)}m`);
+            return {
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
+                accuracy: pos.coords.accuracy || null,
+                deviceIp: deviceIp,
+                source: "GPS/Device"
+            };
         }
-    });
+    } catch (err) {
+        console.warn("📍 [GPS Track] Error awaiting primed GPS:", err);
+    }
+
+    console.warn("📍 [GPS Track] Initial GPS lock took longer than timeout; using initial IP fallback and starting background GPS precision tracker...");
+    const ipFallback = await fetchIPLocationFallback();
+    if (deviceIp && deviceIp !== "Auto-Recognized" && ipFallback.deviceIp === "Auto-Recognized") {
+        ipFallback.deviceIp = deviceIp;
+    }
+    return ipFallback;
 }
 
 function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
@@ -1693,19 +1734,21 @@ async function getNearbyLocationName(lat, lon) {
         let localityName = '';
         let cityName = '';
         let stateName = '';
+        let pincode = '';
 
         const nonPlaceNames = new Set(['unnamed road', 'unnamed', 'service road', 'residential road']);
 
-        // 1. Process Photon POIs (find closest marked place/venue within <= 100m)
+        // 1. Process Photon POIs (find closest marked place/venue within <= 150m)
         if (photonRes.status === 'fulfilled' && photonRes.value && photonRes.value.features) {
             for (const f of photonRes.value.features) {
                 const p = f.properties;
                 const coords = f.geometry && f.geometry.coordinates; // [lon, lat]
                 if (p) {
                     if (p.street && !streetName) streetName = p.street;
-                    if ((p.locality || p.district) && !localityName) localityName = p.locality || p.district;
+                    if ((p.locality || p.district || p.suburb) && !localityName) localityName = p.locality || p.district || p.suburb;
                     if (p.city && !cityName) cityName = p.city;
                     if (p.state && !stateName) stateName = p.state;
+                    if (p.postcode && !pincode) pincode = p.postcode;
 
                     const osmKey = (p.osm_key || '').toLowerCase();
                     const name = (p.name || '').trim();
@@ -1714,9 +1757,9 @@ async function getNearbyLocationName(lat, lon) {
                     if (osmKey === 'highway' || osmKey === 'railway') {
                         if (name && !streetName) streetName = name;
                     } else if (name && coords && coords.length >= 2 && !nonPlaceNames.has(name.toLowerCase())) {
-                        // Actual marked venue / POI (shop, restaurant, hotel, amenity, leisure, tourism, etc.)
+                        // Actual marked venue / POI (shop, restaurant, hotel, amenity, leisure, tourism, temple, etc.)
                         const dist = calculateDistanceMeters(latNum, lonNum, coords[1], coords[0]);
-                        if (dist <= 100 && dist < minDistance) {
+                        if (dist <= 150 && dist < minDistance) {
                             minDistance = dist;
                             detectedLandmark = name;
                         }
@@ -1725,7 +1768,7 @@ async function getNearbyLocationName(lat, lon) {
             }
         }
 
-        // 2. Process Nominatim details (find any closest landmark/amenity within <= 100m)
+        // 2. Process Nominatim details (find any closest landmark/amenity within <= 150m)
         if (nominatimRes.status === 'fulfilled' && nominatimRes.value && nominatimRes.value.address) {
             const addr = nominatimRes.value.address;
             const nLat = parseFloat(nominatimRes.value.lat);
@@ -1735,35 +1778,58 @@ async function getNearbyLocationName(lat, lon) {
                 dist = calculateDistanceMeters(latNum, lonNum, nLat, nLon);
             }
 
-            const landmark = addr.amenity || addr.shop || addr.tourism || addr.leisure || addr.building || addr.office || addr.hotel || addr.restaurant || addr.cafe || addr.pub || addr.bar || addr.fast_food || addr.commercial;
-            if (landmark && dist <= 100 && dist < minDistance) {
+            const landmark = addr.amenity || addr.shop || addr.tourism || addr.leisure || addr.building || addr.office || addr.hotel || addr.restaurant || addr.cafe || addr.pub || addr.bar || addr.fast_food || addr.commercial || addr.place_of_worship || addr.temple || addr.hospital || addr.school || addr.college || addr.bank || addr.mall;
+            if (landmark && dist <= 150 && dist < minDistance) {
                 minDistance = dist;
                 detectedLandmark = landmark;
             }
 
-            if (addr.road && !streetName) streetName = addr.road;
-            if ((addr.neighbourhood || addr.suburb || addr.residential) && !localityName) localityName = addr.neighbourhood || addr.suburb || addr.residential;
-            if ((addr.city || addr.town || addr.village) && !cityName) cityName = addr.city || addr.town || addr.village;
-            if (addr.state && !stateName) stateName = addr.state;
+            if ((addr.road || addr.pedestrian || addr.footway || addr.street) && !streetName) {
+                streetName = addr.road || addr.pedestrian || addr.footway || addr.street;
+            }
+            if ((addr.neighbourhood || addr.suburb || addr.residential || addr.quarter || addr.hamlet || addr.village || addr.colony || addr.sector || addr.mohalla) && !localityName) {
+                localityName = addr.neighbourhood || addr.suburb || addr.residential || addr.quarter || addr.hamlet || addr.village || addr.colony || addr.sector || addr.mohalla;
+            }
+            if ((addr.city || addr.town || addr.municipality || addr.city_district || addr.county || addr.state_district || addr.district) && !cityName) {
+                cityName = addr.city || addr.town || addr.municipality || addr.city_district || addr.county || addr.state_district || addr.district;
+            }
+            if ((addr.state || addr.province || addr.region) && !stateName) {
+                stateName = addr.state || addr.province || addr.region;
+            }
+            if (addr.postcode && !pincode) {
+                pincode = addr.postcode;
+            }
         }
 
-        // 3. Process BigDataCloud for fallback city/locality/state
+        // 3. Process BigDataCloud for fallback city/locality/state/postcode
         if (bdcRes.status === 'fulfilled' && bdcRes.value) {
             const b = bdcRes.value;
             if (b.locality && !localityName) localityName = b.locality;
             if (b.city && !cityName) cityName = b.city;
             if (b.principalSubdivision && !stateName) stateName = b.principalSubdivision;
+            if (b.postcode && !pincode) pincode = b.postcode;
         }
 
         // Build the cleanest, most accurate single-line location description
         const parts = [];
-        if (detectedLandmark && minDistance <= 100) {
+        if (detectedLandmark && minDistance <= 150) {
             parts.push(`Near ${detectedLandmark} (~${Math.round(minDistance)}m)`);
         }
-        if (streetName && !parts.includes(streetName)) parts.push(streetName);
-        if (localityName && !parts.includes(localityName)) parts.push(localityName);
-        if (cityName && !parts.includes(cityName)) parts.push(cityName);
-        if (stateName && !parts.includes(stateName)) parts.push(stateName);
+        if (streetName && !parts.some(p => p.toLowerCase().includes(streetName.toLowerCase()))) {
+            parts.push(streetName);
+        }
+        if (localityName && !parts.some(p => p.toLowerCase().includes(localityName.toLowerCase()))) {
+            parts.push(localityName);
+        }
+        if (cityName) {
+            const cleanCity = pincode ? `${cityName} - ${pincode}` : cityName;
+            if (!parts.some(p => p.toLowerCase().includes(cityName.toLowerCase()))) {
+                parts.push(cleanCity);
+            }
+        }
+        if (stateName && !parts.some(p => p.toLowerCase().includes(stateName.toLowerCase()))) {
+            parts.push(stateName);
+        }
 
         if (parts.length > 0) {
             return parts.join(', ');
@@ -1773,6 +1839,82 @@ async function getNearbyLocationName(lat, lon) {
     }
 
     return "Location Unknown";
+}
+
+function startContinuousGPSRefiner(userId, actionType, serialKey, initialAccuracy, initialSource) {
+    if (typeof navigator === 'undefined' || !navigator.geolocation || !db || !userId || !serialKey) return;
+
+    const isIP = typeof initialSource === 'string' && initialSource.toLowerCase().includes('ip');
+    const isCoarse = typeof initialAccuracy === 'number' && initialAccuracy > 30;
+
+    // Only refine if initial record was IP-based or coarse accuracy
+    if (!isIP && !isCoarse && initialAccuracy !== null) {
+        return;
+    }
+
+    console.log(`📡 [GPS Auto-Upgrade] Starting background precision tracker for ${userId} (${actionType} / ${serialKey})...`);
+
+    let bestAcc = (typeof initialAccuracy === 'number' && initialAccuracy > 0) ? initialAccuracy : 999999;
+    let refinerWatchId = null;
+
+    const stopRefiner = () => {
+        if (refinerWatchId !== null && navigator.geolocation.clearWatch) {
+            try { navigator.geolocation.clearWatch(refinerWatchId); } catch (e) {}
+            refinerWatchId = null;
+        }
+    };
+
+    // Auto-stop background refinement after 45 seconds
+    const timeoutId = setTimeout(() => {
+        stopRefiner();
+        console.log(`📡 [GPS Auto-Upgrade] Background precision tracker completed for ${userId} (${serialKey}).`);
+    }, 45000);
+
+    try {
+        refinerWatchId = navigator.geolocation.watchPosition(
+            async (pos) => {
+                if (!pos || !pos.coords) return;
+                const acc = pos.coords.accuracy || 999999;
+                const newLat = pos.coords.latitude;
+                const newLon = pos.coords.longitude;
+
+                // If upgraded from IP to true GPS OR accuracy improved significantly
+                if (isIP || acc < bestAcc - 10 || acc <= 25) {
+                    bestAcc = acc;
+                    console.log(`🎯 [GPS Auto-Upgrade] Improved position acquired: lat=${newLat}, lon=${newLon} (±${Math.round(acc)}m). Updating Firebase...`);
+
+                    const dmsString = convertToDMS(newLat, newLon);
+                    const newLocationName = await getNearbyLocationName(newLat, newLon);
+
+                    const targetRef = db.ref(`GPS Track Table/${userId}/${actionType}/${serialKey}`);
+                    await targetRef.update({
+                        latitude: newLat,
+                        longitude: newLon,
+                        dmsCoordinates: dmsString,
+                        locationName: newLocationName,
+                        accuracy: acc,
+                        source: "GPS/Device",
+                        autoUpgraded: true
+                    }).catch(e => console.warn("Failed to update GPS upgrade in DB:", e));
+
+                    console.log(`✅ [GPS Auto-Upgrade] Record ${serialKey} for ${userId} successfully upgraded to true GPS.`);
+
+                    // If high precision (<= 15m) achieved, stop early
+                    if (acc <= 15) {
+                        clearTimeout(timeoutId);
+                        stopRefiner();
+                    }
+                }
+            },
+            (err) => {
+                // Ignore background watch error
+            },
+            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        );
+    } catch (e) {
+        clearTimeout(timeoutId);
+        stopRefiner();
+    }
 }
 
 function convertToDMS(lat, lon) {
@@ -1997,14 +2139,19 @@ async function recordGPSTrack(userId, actionType) {
 
         // Reconstruct keys as 1st, 2nd, ... 10th
         const updatedObject = {};
+        let lastSerialKey = '1st';
         existingList.forEach((entry, idx) => {
             const serialKey = getOrdinalSuffix(idx + 1);
             entry.serial = serialKey;
             updatedObject[serialKey] = entry;
+            lastSerialKey = serialKey;
         });
 
         await targetRef.set(updatedObject);
         console.log(`✅ [GPS Track] ${type} for ${userId} saved at GPS Track Table/${userId}/${type} (${existingList.length} records)`);
+
+        // Start background precision refiner to auto-upgrade to real GPS if initial was IP or coarse
+        startContinuousGPSRefiner(userId, type, lastSerialKey, loc.accuracy, loc.source);
     } catch (err) {
         console.error(`❌ [GPS Track] Error for ${userId} (${type}):`, err);
     }
@@ -4315,6 +4462,12 @@ function updateBiometricUI(overlay, success) {
 
 acceptBtn.addEventListener('click', async (e) => {
     if (e) e.preventDefault();
+
+    // Immediately prime high-accuracy GPS hardware sensor on direct user gesture
+    if (typeof primeGPSLocation === 'function') {
+        primeGPSLocation();
+    }
+
     const username = usernameInput.value.trim();
     const password = passwordInput.value.trim();
     let hasError = false;
@@ -10830,7 +10983,10 @@ window.openGPSTrackModal = function () {
                 <!-- Row 12: Source / Accuracy -->
                 <div class="gps-detail-row">
                     <span class="gps-detail-label">📡 Source / Accuracy</span>
-                    <span class="gps-detail-value" style="opacity: 0.9;">${rec.source || 'GPS/Device'} ${rec.accuracy ? `(±${Math.round(rec.accuracy)}m)` : ''}</span>
+                    <span class="gps-detail-value" style="opacity: 0.9;">
+                        ${rec.source || 'GPS/Device'} ${rec.accuracy ? `(±${Math.round(rec.accuracy)}m)` : ''}
+                        ${rec.autoUpgraded ? '<span style="color:#00e676; font-weight:bold; font-size:0.75rem; margin-left:4px; background: rgba(0,230,118,0.15); padding: 2px 6px; border-radius: 4px;">🎯 Auto-Upgraded</span>' : ''}
+                    </span>
                 </div>
 
                 <!-- Row 13: Dedicated Direction & Map Buttons Side by Side -->
