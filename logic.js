@@ -977,7 +977,10 @@ window.updateHeaderProfilePic = function () {
         }
         #callLocalVideo {
             position: absolute; top: 75px; right: 15px; z-index: 11;
-            width: clamp(90px, 24vw, 130px); height: clamp(140px, 38vw, 195px);
+            width: clamp(90px, 25vw, 130px) !important;
+            height: auto !important;
+            aspect-ratio: 9 / 16;
+            max-height: 220px;
             border: 2px solid rgba(255, 255, 255, 0.85); border-radius: 14px;
             box-shadow: 0 8px 24px rgba(0,0,0,0.6), 0 0 15px rgba(0, 210, 255, 0.25);
             object-fit: cover; 
@@ -990,6 +993,13 @@ window.updateHeaderProfilePic = function () {
             image-rendering: -webkit-optimize-contrast;
             filter: contrast(1.04) saturate(1.08) brightness(1.02);
             transition: top 0.3s ease, left 0.3s ease, right 0.3s ease, bottom 0.3s ease, transform 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        @media (min-width: 769px), (orientation: landscape) {
+            #callLocalVideo {
+                width: clamp(140px, 18vw, 220px) !important;
+                aspect-ratio: 16 / 9;
+            }
         }
         #pip-remote-video {
             image-rendering: -webkit-optimize-contrast;
@@ -2305,12 +2315,36 @@ function resetHardwareZoom(stream) {
         const track = stream.getVideoTracks()[0];
         if (track && track.getCapabilities) {
             const caps = track.getCapabilities();
+            const advanced = {};
             if (caps.zoom) {
-                const minZoom = (typeof caps.zoom.min === 'number') ? caps.zoom.min : 1;
-                track.applyConstraints({ advanced: [{ zoom: minZoom }] }).catch(() => {});
+                advanced.zoom = (typeof caps.zoom.min === 'number') ? caps.zoom.min : 1;
+            }
+            if (caps.focusMode && Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
+                advanced.focusMode = 'continuous';
+            }
+            if (caps.exposureMode && Array.isArray(caps.exposureMode) && caps.exposureMode.includes('continuous')) {
+                advanced.exposureMode = 'continuous';
+            }
+            if (Object.keys(advanced).length > 0) {
+                track.applyConstraints({ advanced: [advanced] }).catch(() => {});
             }
         }
     } catch (e) {}
+}
+
+// Auto-adjust local video box aspect ratio to dynamically match exact video resolution (Zero Crop / Zero Zoom)
+function syncVideoAspect(videoEl) {
+    if (!videoEl) return;
+    const update = () => {
+        if (videoEl.videoWidth && videoEl.videoHeight) {
+            videoEl.style.aspectRatio = `${videoEl.videoWidth} / ${videoEl.videoHeight}`;
+            videoEl.style.height = 'auto';
+        }
+    };
+    videoEl.addEventListener('loadedmetadata', update);
+    videoEl.addEventListener('playing', update);
+    videoEl.addEventListener('resize', update);
+    if (videoEl.videoWidth && videoEl.videoHeight) update();
 }
 
 // --- Set Custom Background ---
@@ -6958,6 +6992,7 @@ async function startCall(video, isIncoming = false) {
             callStream.getVideoTracks().forEach(t => t.enabled = true);
             callLocalVideo.srcObject = callStream;
             updateVideoMirroring();
+            syncVideoAspect(callLocalVideo);
         }
 
         // 3. Initiate Connection if Caller
@@ -7581,6 +7616,7 @@ function swapVideoFeeds() {
     callRemoteVideo.srcObject = localVideoSrc;
 
     updateVideoMirroring();
+    syncVideoAspect(callLocalVideo);
 
     // Ensure playback continues
     callLocalVideo.play().catch(e => console.error("Local video play failed after swap:", e));
@@ -7639,6 +7675,7 @@ callFlipBtn.addEventListener('click', async (e) => {
             callStream.addTrack(newVideoTrack);
 
             updateVideoMirroring();
+            syncVideoAspect(callLocalVideo);
             sendSignal('facingMode', callFacingMode);
 
             // Restore Mute State
