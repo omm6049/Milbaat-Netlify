@@ -814,11 +814,13 @@ window.updateHeaderProfilePic = function () {
             grid-template-columns: 1fr auto 1fr;
             align-items: center;
             padding: 0 15px;
-            background: #0F172A !important;
-            border-bottom: 2px solid rgba(24, 132, 210, 0.934) !important;
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.85) 0%, rgba(15, 23, 42, 0.45) 70%, transparent 100%) !important;
+            border-bottom: 1px solid rgba(24, 132, 210, 0.35) !important;
             box-sizing: border-box;
             z-index: 100;
             color: white;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
         }
 
         #callHeaderStatusWrapper {
@@ -836,6 +838,7 @@ window.updateHeaderProfilePic = function () {
             font-weight: bold;
             margin: 0;
             letter-spacing: 0.5px; 
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
         }
 
         #callHeaderName { 
@@ -847,6 +850,7 @@ window.updateHeaderProfilePic = function () {
             justify-self: start;
             text-align: left;
             max-width: 100%;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
         }
 
         /* 2. PiP Icon Size */
@@ -863,17 +867,21 @@ window.updateHeaderProfilePic = function () {
             line-height: 1 !important;
             cursor: pointer !important;
             justify-self: end;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
         }
         #callPipBtn svg { pointer-events: none; }
 
         #call-overlay .call-footer { 
-            position: absolute; bottom: 0; left: 0; width: 100%; height: 80px;
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 85px;
             display: flex; align-items: center; justify-content: center;
             padding: 0 20px; box-sizing: border-box; z-index: 100;
-            background: #0F172A !important;
-            border-top: 2px solid rgba(24, 132, 210, 0.934) !important;
+            background: linear-gradient(0deg, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.5) 70%, transparent 100%) !important;
+            border-top: 1px solid rgba(24, 132, 210, 0.35) !important;
             gap: 15px;
             color: white;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
         }
         
         .blink-anim { animation: blinkText 1.5s infinite; }
@@ -923,21 +931,41 @@ window.updateHeaderProfilePic = function () {
             box-shadow: 0 4px 15px rgba(118, 187, 197, 0.4);
         }
 
-        #callVideoContainer, #callAudioContainer {
+        #callVideoContainer {
             position: absolute !important;
-            top: 65px !important;
-            bottom: 80px !important;
+            top: 0 !important;
+            bottom: 0 !important;
             left: 0 !important;
+            right: 0 !important;
             width: 100% !important;
-            height: calc(100% - 145px) !important;
+            height: 100% !important;
             z-index: 1;
             overflow: hidden;
+            background: #000;
+        }
+
+        #callAudioContainer {
+            position: absolute !important;
+            top: 0 !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            z-index: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
         }
 
         #callRemoteVideo {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            object-position: center center;
             transform: translateZ(0);
             -webkit-transform: translateZ(0);
             backface-visibility: hidden;
@@ -945,13 +973,15 @@ window.updateHeaderProfilePic = function () {
             image-rendering: -webkit-optimize-contrast;
             filter: contrast(1.04) saturate(1.08) brightness(1.02);
             transition: filter 0.3s ease, transform 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+            cursor: pointer;
         }
         #callLocalVideo {
-            position: absolute; top: 80px; right: 15px; z-index: 11;
-            width: clamp(100px, 25vw, 140px); height: clamp(150px, 40vw, 210px);
-            border: 2px solid rgba(255, 255, 255, 0.8); border-radius: 14px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5), 0 0 20px rgba(0, 210, 255, 0.2);
+            position: absolute; top: 75px; right: 15px; z-index: 11;
+            width: clamp(90px, 24vw, 130px); height: clamp(140px, 38vw, 195px);
+            border: 2px solid rgba(255, 255, 255, 0.85); border-radius: 14px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6), 0 0 15px rgba(0, 210, 255, 0.25);
             object-fit: cover; 
+            object-position: center center;
             cursor: move; background-color: #000;
             transform: translateZ(0);
             -webkit-transform: translateZ(0);
@@ -964,6 +994,8 @@ window.updateHeaderProfilePic = function () {
         #pip-remote-video {
             image-rendering: -webkit-optimize-contrast;
             filter: contrast(1.04) saturate(1.08) brightness(1.02);
+            object-fit: cover;
+            object-position: center center;
         }
         /* Custom PiP View Styles */
         #custom-pip-view {
@@ -2233,6 +2265,54 @@ let callHistoryView = null;
 let alphaCallHistoryData = [];
 let remoteFacingMode = 'user';
 
+// --- Natural Orientation & Device Responsive Video Constraints (No Zoom / Distortion) ---
+function getNaturalVideoConstraints(facingMode = 'user', isCall = false) {
+    const isPortrait = window.innerHeight >= window.innerWidth;
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth <= 768 && isPortrait);
+    
+    if (isMobile && isPortrait) {
+        // Mobile Portrait: 9:16 vertical sensor/stream (Natural framing, no artificial side cropping/zoom)
+        return {
+            facingMode: facingMode ? { ideal: facingMode } : undefined,
+            width: isCall ? { ideal: 720, max: 1080 } : { ideal: 1080, max: 2160 },
+            height: isCall ? { ideal: 1280, max: 1920 } : { ideal: 1920, max: 3840 },
+            aspectRatio: { ideal: 9 / 16 },
+            frameRate: { ideal: 30, min: 24, max: 30 }
+        };
+    } else {
+        // Laptop / Desktop / Mobile Landscape: 16:9 widescreen sensor/stream
+        return {
+            facingMode: facingMode ? { ideal: facingMode } : undefined,
+            width: isCall ? { ideal: 1280, max: 1920 } : { ideal: 1920, max: 3840 },
+            height: isCall ? { ideal: 720, max: 1080 } : { ideal: 1080, max: 2160 },
+            aspectRatio: { ideal: 16 / 9 },
+            frameRate: { ideal: 30, min: 24, max: 30 }
+        };
+    }
+}
+
+function getNaturalFallbackConstraints(facingMode = 'user') {
+    const isPortrait = window.innerHeight >= window.innerWidth;
+    return {
+        facingMode: facingMode ? { ideal: facingMode } : undefined,
+        aspectRatio: { ideal: isPortrait ? (9 / 16) : (16 / 9) }
+    };
+}
+
+function resetHardwareZoom(stream) {
+    if (!stream) return;
+    try {
+        const track = stream.getVideoTracks()[0];
+        if (track && track.getCapabilities) {
+            const caps = track.getCapabilities();
+            if (caps.zoom) {
+                const minZoom = (typeof caps.zoom.min === 'number') ? caps.zoom.min : 1;
+                track.applyConstraints({ advanced: [{ zoom: minZoom }] }).catch(() => {});
+            }
+        }
+    } catch (e) {}
+}
+
 // --- Set Custom Background ---
 body.style.background = "none";
 
@@ -2688,28 +2768,41 @@ let swipeEndY = 0;
             display: none; /* Default hidden */
             flex-direction: column;
             justify-content: space-between;
+            background: #000 !important;
         }
         
+        #cameraVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center center;
+            background: #000;
+        }
+
         .camera-header {
             position: absolute; top: 0; left: 0; width: 100%; height: 65px;
             display: flex; align-items: center; justify-content: space-between; padding: 0 15px;
             z-index: 10; box-sizing: border-box;
-            background: #0F172A !important;
-            border-bottom: 2px solid rgb(31, 191, 231) !important;
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.85) 0%, rgba(15, 23, 42, 0.4) 70%, transparent 100%) !important;
+            border-bottom: none !important;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
         }
 
         #cameraFacingLabel {
             position: absolute; left: 50%; transform: translateX(-50%);
             font-size: 1rem; font-weight: bold; color: white; letter-spacing: 0.5px;
-            text-shadow: 0 2px 5px rgba(0,0,0,0.5); pointer-events: none;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.8); pointer-events: none;
         }
 
         .camera-footer {
-            position: absolute; bottom: 0; left: 0; width: 100%; height: 90px;
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 95px;
             display: flex; align-items: center; justify-content: space-between;
             padding: 0 30px; z-index: 10; box-sizing: border-box;
-            background: #0F172A !important;
-            border-top: 2px solid rgb(31, 191, 231) !important;
+            background: linear-gradient(0deg, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.5) 70%, transparent 100%) !important;
+            border-top: none !important;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
         }
 
         /* General Button Styles */
@@ -2717,11 +2810,12 @@ let swipeEndY = 0;
             width: 45px; height: 45px;
             border-radius: 50%;
             border: none !important;
-            background: transparent !important;
+            background: rgba(255, 255, 255, 0.15) !important;
             color: white;
             display: flex; align-items: center; justify-content: center;
             cursor: pointer; outline: none; padding: 0;
-            transition: transform 0.2s;
+            transition: transform 0.2s, background 0.2s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         }
         
         .camera-footer button:active, .camera-header button:active { transform: scale(0.95); }
@@ -2731,6 +2825,7 @@ let swipeEndY = 0;
             width: 70px !important; height: 70px !important;
             border: 4px solid #27fb10 !important;
             background: transparent !important;
+            box-shadow: 0 0 15px rgba(39, 251, 16, 0.4) !important;
         }
         #captureCameraBtn::after {
             content: ''; display: block;
@@ -2740,7 +2835,7 @@ let swipeEndY = 0;
 
         /* Filter Button (Right) */
         #cameraFilterBtn {
-            background-color: transparent !important;
+            background: rgba(255, 255, 255, 0.15) !important;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -6554,7 +6649,7 @@ async function startCameraStream() {
     }
 
     // Mirror effect: Only mirror the view for the front (user) camera
-    cameraVideo.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+    cameraVideo.style.transform = (currentFacingMode === 'user') ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)';
 
     const label = document.getElementById('cameraFacingLabel');
     if (label) label.innerText = currentFacingMode === 'user' ? 'Front Cam' : 'Back Cam';
@@ -6562,13 +6657,19 @@ async function startCameraStream() {
     try {
         try {
             cameraStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: currentFacingMode, width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30 } }
+                video: getNaturalVideoConstraints(currentFacingMode, false)
             });
         } catch (e) {
-            console.warn("High quality specific facingMode failed, trying best available 4K...", e);
-            cameraStream = await navigator.mediaDevices.getUserMedia({
-                video: { width: { ideal: 3840 }, height: { ideal: 2160 } } // Attempt 4K in fallback
-            });
+            console.warn("High quality specific facingMode failed, trying natural fallback...", e);
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: getNaturalFallbackConstraints(currentFacingMode)
+                });
+            } catch (e2) {
+                cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: true
+                });
+            }
         }
 
         cameraVideo.srcObject = cameraStream;
@@ -6576,16 +6677,12 @@ async function startCameraStream() {
         cameraVideo.setAttribute('autoplay', 'true');
         await cameraVideo.play();
 
-        // Ensure 1x zoom if supported by the device
-        const track = cameraStream.getVideoTracks()[0];
-        const caps = track.getCapabilities ? track.getCapabilities() : {};
-        if (caps.zoom) {
-            track.applyConstraints({ advanced: [{ zoom: 1 }] }).catch(err => console.warn("Zoom constraint failed:", err));
-        }
+        // Ensure 1x zoom if supported by the device (no digital/telephoto crop)
+        resetHardwareZoom(cameraStream);
 
         // Show flash only for back camera
-
-        // Check capabilities for torch support to ensure button only shows if working
+        const track = cameraStream.getVideoTracks()[0];
+        const caps = track && track.getCapabilities ? track.getCapabilities() : {};
         if ('torch' in caps) {
             flashCameraBtn.style.display = caps.torch ? 'flex' : 'none';
         } else {
@@ -6641,10 +6738,12 @@ function stopCamera() {
 closeCameraBtn.addEventListener('click', stopCamera);
 
 captureCameraBtn.addEventListener('click', () => {
-    const W_d = cameraVideo.clientWidth;
-    const H_d = cameraVideo.clientHeight;
+    const W_d = cameraVideo.clientWidth || window.innerWidth;
+    const H_d = cameraVideo.clientHeight || window.innerHeight;
     const W_s = cameraVideo.videoWidth;
     const H_s = cameraVideo.videoHeight;
+
+    if (!W_s || !H_s) return;
 
     // object-fit: cover scales the video to cover the container. Find the scale factor.
     const scale = Math.max(W_d / W_s, H_d / H_s);
@@ -6656,20 +6755,16 @@ captureCameraBtn.addEventListener('click', () => {
     const offsetX = (renderedWidth - W_d) / 2;
     const offsetY = (renderedHeight - H_d) / 2;
 
-    // Define the visible area we want to capture (subtract header: 65px and footer: 90px)
-    const visibleY = 65;
-    const visibleHeight = H_d - 65 - 90;
-
     // Map display pixel coordinates back to the source video dimensions
     const sx = offsetX / scale;
-    const sy = (offsetY + visibleY) / scale;
+    const sy = offsetY / scale;
     const sWidth = W_d / scale;
-    const sHeight = visibleHeight / scale;
+    const sHeight = H_d / scale;
 
     const canvas = document.createElement('canvas');
-    // Create high-res canvas representing ONLY the cropped visible area
-    canvas.width = sWidth;
-    canvas.height = sHeight;
+    // Create high-res canvas representing the full visible area
+    canvas.width = Math.min(Math.round(sWidth), 1920);
+    canvas.height = Math.round(canvas.width * (sHeight / sWidth));
     const ctx = canvas.getContext('2d');
 
     // Mirror the capture only if the front camera is used
@@ -6683,8 +6778,8 @@ captureCameraBtn.addEventListener('click', () => {
     const filters = ['none', 'grayscale(100%)', 'sepia(100%)', 'invert(100%)'];
     if (fIdx > 0) ctx.filter = filters[fIdx];
 
-    // Draw only the cropped portion directly from the video onto the canvas
-    ctx.drawImage(cameraVideo, sx, sy, sWidth, sHeight, 0, 0, sWidth, sHeight);
+    // Draw visible preview directly from the video onto the canvas
+    ctx.drawImage(cameraVideo, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
 
     // Get image
     currentImageBase64 = canvas.toDataURL('image/jpeg', 0.94); // High quality
@@ -6827,13 +6922,8 @@ async function startCall(video, isIncoming = false) {
             channelCount: { ideal: 1 }
         };
 
-        // WhatsApp-like smooth 720p HD resolution with steady 30 FPS
-        const videoConstraints = video ? {
-            facingMode: callFacingMode,
-            width: { ideal: 720, max: 1280 },
-            height: { ideal: 1280, max: 1920 },
-            frameRate: { ideal: 30, min: 24, max: 30 }
-        } : false;
+        // WhatsApp-like smooth 720p HD resolution with steady 30 FPS and natural aspect ratio
+        const videoConstraints = video ? getNaturalVideoConstraints(callFacingMode, true) : false;
 
         try {
             callStream = await navigator.mediaDevices.getUserMedia({
@@ -6841,15 +6931,25 @@ async function startCall(video, isIncoming = false) {
                 video: videoConstraints
             });
         } catch (mediaErr) {
-            console.warn("High-spec constraints failed, falling back to standard constraints:", mediaErr);
-            callStream = await navigator.mediaDevices.getUserMedia({
-                audio: true,
-                video: video ? { facingMode: callFacingMode } : false
-            });
+            console.warn("High-spec constraints failed, falling back to standard natural constraints:", mediaErr);
+            try {
+                callStream = await navigator.mediaDevices.getUserMedia({
+                    audio: true,
+                    video: video ? getNaturalFallbackConstraints(callFacingMode) : false
+                });
+            } catch (e2) {
+                callStream = await navigator.mediaDevices.getUserMedia({
+                    audio: true,
+                    video: video ? true : false
+                });
+            }
         }
 
         // Force enable tracks
         callStream.getAudioTracks().forEach(t => t.enabled = true);
+
+        // Reset hardware zoom to wide 1x natural view
+        if (video) resetHardwareZoom(callStream);
 
         // Initialize Audio Output (Default to Earpiece)
         updateAudioOutput();
@@ -7449,20 +7549,20 @@ function updateVideoMirroring() {
     const isLocalInSmallBox = (callLocalVideo.srcObject === callStream);
 
     if (isLocalInSmallBox) {
-        callLocalVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1)' : 'none';
-        callRemoteVideo.style.transform = (remoteFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+        callLocalVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)';
+        callRemoteVideo.style.transform = (remoteFacingMode === 'user') ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)';
     } else {
-        callRemoteVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1)' : 'none';
-        callLocalVideo.style.transform = (remoteFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+        callRemoteVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)';
+        callLocalVideo.style.transform = (remoteFacingMode === 'user') ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)';
     }
 
     const pipVideo = document.getElementById('pip-remote-video');
     if (pipVideo) {
         const isLocalInBigBox = (callRemoteVideo.srcObject === callStream);
         if (isLocalInBigBox) {
-            pipVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+            pipVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)';
         } else {
-            pipVideo.style.transform = (remoteFacingMode === 'user') ? 'scaleX(-1)' : 'none';
+            pipVideo.style.transform = (remoteFacingMode === 'user') ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)';
         }
     }
 }
@@ -7505,15 +7605,24 @@ callFlipBtn.addEventListener('click', async (e) => {
         callStream.getVideoTracks().forEach(t => t.stop());
         callFacingMode = callFacingMode === 'user' ? 'environment' : 'user';
         try {
-            const newStream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: callFacingMode,
-                    width: { ideal: 720, max: 1280 },
-                    height: { ideal: 1280, max: 1920 },
-                    frameRate: { ideal: 30, max: 30 }
+            let newStream;
+            try {
+                newStream = await navigator.mediaDevices.getUserMedia({
+                    video: getNaturalVideoConstraints(callFacingMode, true)
+                });
+            } catch (flipErr) {
+                try {
+                    newStream = await navigator.mediaDevices.getUserMedia({
+                        video: getNaturalFallbackConstraints(callFacingMode)
+                    });
+                } catch (e2) {
+                    newStream = await navigator.mediaDevices.getUserMedia({
+                        video: true
+                    });
                 }
-            });
+            }
             const newVideoTrack = newStream.getVideoTracks()[0];
+            resetHardwareZoom(newStream);
 
             // Replace track in Peer Connection
             if (peerConnection) {
@@ -7702,6 +7811,26 @@ window.addEventListener('mousemove', handleLocalVideoDragMove);
 window.addEventListener('touchmove', handleLocalVideoDragMove, { passive: false });
 window.addEventListener('mouseup', handleLocalVideoDragEnd);
 window.addEventListener('touchend', handleLocalVideoDragEnd);
+
+// --- Double-Tap Remote Video to Toggle Fit/Fill ---
+let lastRemoteVideoTap = 0;
+if (callRemoteVideo) {
+    callRemoteVideo.addEventListener('click', (e) => {
+        const currentTime = Date.now();
+        if (currentTime - lastRemoteVideoTap < 350) {
+            e.stopPropagation();
+            const currentFit = callRemoteVideo.style.objectFit || 'cover';
+            if (currentFit === 'cover') {
+                callRemoteVideo.style.objectFit = 'contain';
+                showToast("Video: Original Aspect Ratio (Full View)");
+            } else {
+                callRemoteVideo.style.objectFit = 'cover';
+                showToast("Video: Full Screen View");
+            }
+        }
+        lastRemoteVideoTap = currentTime;
+    });
+}
 
 // --- Audio Recording Logic ---
 micBtn.addEventListener('click', () => {
