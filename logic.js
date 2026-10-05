@@ -2266,37 +2266,21 @@ let callHistoryView = null;
 let alphaCallHistoryData = [];
 let remoteFacingMode = 'user';
 
-// --- Natural Orientation & Device Responsive Video Constraints (No Zoom / Distortion) ---
+// --- Natural Uncropped Wide Camera & Sensor Constraints (100% Mirror/Camera Look, Zero Zoom) ---
 function getNaturalVideoConstraints(facingMode = 'user', isCall = false) {
-    const isPortrait = window.innerHeight >= window.innerWidth;
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth <= 768 && isPortrait);
-    
-    if (isMobile && isPortrait) {
-        // Mobile Portrait: 9:16 vertical sensor/stream (Natural framing, no artificial side cropping/zoom)
-        return {
-            facingMode: facingMode ? { ideal: facingMode } : undefined,
-            width: isCall ? { ideal: 720, max: 1080 } : { ideal: 1080, max: 2160 },
-            height: isCall ? { ideal: 1280, max: 1920 } : { ideal: 1920, max: 3840 },
-            aspectRatio: { ideal: 9 / 16 },
-            frameRate: { ideal: 30, min: 24, max: 30 }
-        };
-    } else {
-        // Laptop / Desktop / Mobile Landscape: 16:9 widescreen sensor/stream
-        return {
-            facingMode: facingMode ? { ideal: facingMode } : undefined,
-            width: isCall ? { ideal: 1280, max: 1920 } : { ideal: 1920, max: 3840 },
-            height: isCall ? { ideal: 720, max: 1080 } : { ideal: 1080, max: 2160 },
-            aspectRatio: { ideal: 16 / 9 },
-            frameRate: { ideal: 30, min: 24, max: 30 }
-        };
-    }
+    return {
+        facingMode: facingMode ? { ideal: facingMode } : 'user',
+        width: isCall ? { ideal: 1280 } : { ideal: 1920 },
+        height: isCall ? { ideal: 720 } : { ideal: 1080 },
+        frameRate: { ideal: 30, max: 30 }
+    };
 }
 
 function getNaturalFallbackConstraints(facingMode = 'user') {
-    const isPortrait = window.innerHeight >= window.innerWidth;
     return {
-        facingMode: facingMode ? { ideal: facingMode } : undefined,
-        aspectRatio: { ideal: isPortrait ? (9 / 16) : (16 / 9) }
+        facingMode: facingMode ? { ideal: facingMode } : 'user',
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
     };
 }
 
@@ -2308,6 +2292,7 @@ function resetHardwareZoom(stream) {
             const caps = track.getCapabilities();
             const advanced = {};
             if (caps.zoom) {
+                // Lock lens to widest field of view (min hardware zoom, no digital magnification)
                 advanced.zoom = (typeof caps.zoom.min === 'number') ? caps.zoom.min : 1;
             }
             if (caps.focusMode && Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
@@ -7560,10 +7545,10 @@ function updateVideoMirroring() {
 
     if (isLocalInSmallBox) {
         callLocalVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)';
-        callRemoteVideo.style.transform = (remoteFacingMode === 'user') ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)';
+        callRemoteVideo.style.transform = 'translateZ(0)';
     } else {
         callRemoteVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)';
-        callLocalVideo.style.transform = (remoteFacingMode === 'user') ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)';
+        callLocalVideo.style.transform = 'translateZ(0)';
     }
 
     const pipVideo = document.getElementById('pip-remote-video');
@@ -7572,7 +7557,7 @@ function updateVideoMirroring() {
         if (isLocalInBigBox) {
             pipVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)';
         } else {
-            pipVideo.style.transform = (remoteFacingMode === 'user') ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)';
+            pipVideo.style.transform = 'translateZ(0)';
         }
     }
 }
