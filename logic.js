@@ -934,14 +934,36 @@ window.updateHeaderProfilePic = function () {
             overflow: hidden;
         }
 
-        #callRemoteVideo { width: 100%; height: 100%; object-fit: cover; }
+        #callRemoteVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            image-rendering: -webkit-optimize-contrast;
+            filter: contrast(1.04) saturate(1.08) brightness(1.02);
+            transition: filter 0.3s ease, transform 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+        }
         #callLocalVideo {
             position: absolute; top: 80px; right: 15px; z-index: 11;
             width: clamp(100px, 25vw, 140px); height: clamp(150px, 40vw, 210px);
-            border: 2px solid rgba(255, 255, 255, 0.7); border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3); object-fit: cover; 
+            border: 2px solid rgba(255, 255, 255, 0.8); border-radius: 14px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5), 0 0 20px rgba(0, 210, 255, 0.2);
+            object-fit: cover; 
             cursor: move; background-color: #000;
-            transition: top 0.3s ease, left 0.3s ease, right 0.3s ease, bottom 0.3s ease;
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            image-rendering: -webkit-optimize-contrast;
+            filter: contrast(1.04) saturate(1.08) brightness(1.02);
+            transition: top 0.3s ease, left 0.3s ease, right 0.3s ease, bottom 0.3s ease, transform 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        #pip-remote-video {
+            image-rendering: -webkit-optimize-contrast;
+            filter: contrast(1.04) saturate(1.08) brightness(1.02);
         }
         /* Custom PiP View Styles */
         #custom-pip-view {
@@ -2426,9 +2448,41 @@ if (!bgImage && bgOverlay) {
 
 const rtcConfig = {
     iceServers: [
+        // 1. High-Availability Global STUN Servers (Google, Cloudflare, Twilio)
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-    ]
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        { urls: 'stun:stun.cloudflare.com:3478' },
+        { urls: 'stun:global.stun.twilio.com:3478' },
+
+        // 2. Multi-Port & Secure TLS TURN Relays (For Jio, Airtel, Vi, 4G, 5G, symmetric CGNAT & restricted firewalls)
+        {
+            urls: [
+                'turn:openrelay.metered.ca:80',
+                'turn:openrelay.metered.ca:443',
+                'turn:openrelay.metered.ca:443?transport=tcp',
+                'turn:standard.relay.metered.ca:80',
+                'turn:standard.relay.metered.ca:443',
+                'turn:standard.relay.metered.ca:443?transport=tcp'
+            ],
+            username: 'openrelay',
+            credential: 'openrelay'
+        },
+        {
+            urls: [
+                'turns:openrelay.metered.ca:443?transport=tcp',
+                'turns:standard.relay.metered.ca:443?transport=tcp'
+            ],
+            username: 'openrelay',
+            credential: 'openrelay'
+        }
+    ],
+    iceTransportPolicy: 'all',  // Prefers direct P2P for lowest latency, auto-relays through TURN on symmetric mobile CGNAT
+    iceCandidatePoolSize: 10,    // Pre-gathers candidates for instant < 1s call connection
+    bundlePolicy: 'max-bundle',  // Bundles audio & video over 1 transport to prevent carrier packet loss
+    rtcpMuxPolicy: 'require'     // Multiplexes RTP and RTCP on single port for optimal bandwidth
 };
 
 // Viewer State
@@ -6763,16 +6817,38 @@ async function startCall(video, isIncoming = false) {
     callTimer.style.display = 'none';
     callTimer.innerText = "00:00";
 
-    // 2. Get Local Media
+    // 2. Get Local Media (WhatsApp-grade Audio/Video optimization)
     try {
-        const constraints = {
-            audio: true,
-            video: video ? { facingMode: callFacingMode } : false
+        const audioConstraints = {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: { ideal: 48000 },
+            channelCount: { ideal: 1 }
         };
 
-        callStream = await navigator.mediaDevices.getUserMedia(constraints);
+        // WhatsApp-like smooth 720p HD resolution with steady 30 FPS
+        const videoConstraints = video ? {
+            facingMode: callFacingMode,
+            width: { ideal: 720, max: 1280 },
+            height: { ideal: 1280, max: 1920 },
+            frameRate: { ideal: 30, min: 24, max: 30 }
+        } : false;
 
-        // Force enable tracks and set video resolution/framerate
+        try {
+            callStream = await navigator.mediaDevices.getUserMedia({
+                audio: audioConstraints,
+                video: videoConstraints
+            });
+        } catch (mediaErr) {
+            console.warn("High-spec constraints failed, falling back to standard constraints:", mediaErr);
+            callStream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+                video: video ? { facingMode: callFacingMode } : false
+            });
+        }
+
+        // Force enable tracks
         callStream.getAudioTracks().forEach(t => t.enabled = true);
 
         // Initialize Audio Output (Default to Earpiece)
@@ -6780,9 +6856,6 @@ async function startCall(video, isIncoming = false) {
 
         if (video) {
             callStream.getVideoTracks().forEach(t => t.enabled = true);
-            callStream.getVideoTracks().forEach(t => {
-                t.applyConstraints({ width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30 } });
-            });
             callLocalVideo.srcObject = callStream;
             updateVideoMirroring();
         }
@@ -6809,6 +6882,45 @@ async function startCall(video, isIncoming = false) {
     }
 }
 
+// --- WhatsApp Bandwidth & Smooth Video Optimization Helpers ---
+function optimizeSdp(sdp) {
+    if (!sdp) return sdp;
+    // WhatsApp Audio Profile: Opus Inband FEC + DTX (Silence suppression saves 50%+ audio bandwidth)
+    if (sdp.includes('opus/48000')) {
+        sdp = sdp.replace(/a=rtpmap:(\d+) opus\/48000\/2/gi, (match, pt) => {
+            return `${match}\r\na=fmtp:${pt} useinbandfec=1;usedtx=1;minptime=10;maxaveragebitrate=48000`;
+        });
+        sdp = sdp.replace(/(a=fmtp:\d+ [^\r\n]+)\r\na=fmtp:\d+ [^\r\n]+/gi, '$1');
+    }
+    return sdp;
+}
+
+function optimizePeerConnectionSenders() {
+    if (!peerConnection) return;
+    try {
+        peerConnection.getSenders().forEach(sender => {
+            if (!sender.track) return;
+            const params = sender.getParameters() || {};
+            if (!params.encodings || params.encodings.length === 0) {
+                params.encodings = [{}];
+            }
+            if (sender.track.kind === 'video') {
+                // WhatsApp HD Video Profile: ~950 kbps, 30fps steady framerate with maintain-framerate degradation
+                params.encodings[0].maxBitrate = 950000; // 950 kbps for clean HD with low data
+                params.encodings[0].maxFramerate = 30;
+                params.encodings[0].scaleResolutionDownBy = 1.0;
+                params.degradationPreference = 'maintain-framerate'; // Ultra-smooth motion like edited video
+                sender.setParameters(params).catch(e => console.warn("Video sender params error:", e));
+            } else if (sender.track.kind === 'audio') {
+                // WhatsApp Audio Profile: 48 kbps Opus voice
+                params.encodings[0].maxBitrate = 48000;
+                sender.setParameters(params).catch(e => console.warn("Audio sender params error:", e));
+            }
+        });
+    } catch (err) {
+        console.warn("Sender optimization error:", err);
+    }
+}
 
 function createPeerConnection(isInitiator) {
     peerConnection = new RTCPeerConnection(rtcConfig);
@@ -6817,6 +6929,68 @@ function createPeerConnection(isInitiator) {
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
             sendSignal('candidate', event.candidate);
+        }
+    };
+
+    // Connection Health & Network State Handlers (Wi-Fi <-> 4G/5G Handover & Auto-Recovery)
+    peerConnection.oniceconnectionstatechange = () => {
+        const state = peerConnection.iceConnectionState;
+        console.log("ICE Connection State:", state);
+
+        if (state === 'connected' || state === 'completed') {
+            isCallConnected = true;
+            isCallReconnecting = false;
+            if (callStatusText) {
+                callStatusText.innerText = "Connected";
+                callStatusText.classList.remove('blink-anim');
+                callStatusText.style.display = 'none';
+            }
+            if (callTimer) callTimer.style.display = 'block';
+        } else if (state === 'disconnected') {
+            console.warn("Network switch/drop detected. Attempting auto-reconnect...");
+            isCallReconnecting = true;
+            if (callStatusText) {
+                callStatusText.innerText = "Reconnecting...";
+                callStatusText.classList.add('blink-anim');
+                callStatusText.style.display = 'block';
+            }
+            // Auto ICE restart if initiator
+            if (amICaller && peerConnection && peerConnection.signalingState === 'stable') {
+                peerConnection.createOffer({ iceRestart: true })
+                    .then(offer => {
+                        const opt = new RTCSessionDescription({ type: offer.type, sdp: optimizeSdp(offer.sdp) });
+                        return peerConnection.setLocalDescription(opt);
+                    })
+                    .then(() => {
+                        sendSignal('offer', peerConnection.localDescription);
+                        optimizePeerConnectionSenders();
+                    })
+                    .catch(e => console.warn("Auto ICE restart offer error:", e));
+            }
+        } else if (state === 'failed') {
+            console.warn("ICE connection failed - triggering immediate recovery restart...");
+            if (amICaller && peerConnection && peerConnection.signalingState === 'stable') {
+                peerConnection.createOffer({ iceRestart: true })
+                    .then(offer => {
+                        const opt = new RTCSessionDescription({ type: offer.type, sdp: optimizeSdp(offer.sdp) });
+                        return peerConnection.setLocalDescription(opt);
+                    })
+                    .then(() => {
+                        sendSignal('offer', peerConnection.localDescription);
+                        optimizePeerConnectionSenders();
+                    })
+                    .catch(e => console.warn("ICE restart recovery failed:", e));
+            }
+        }
+    };
+
+    peerConnection.onconnectionstatechange = () => {
+        console.log("Peer Connection State:", peerConnection.connectionState);
+        if (peerConnection.connectionState === 'connected') {
+            isCallConnected = true;
+            isCallReconnecting = false;
+            if (callStatusText) callStatusText.style.display = 'none';
+            if (callTimer) callTimer.style.display = 'block';
         }
     };
 
@@ -6866,9 +7040,16 @@ function createPeerConnection(isInitiator) {
     // Offer Logic
     if (isInitiator) {
         peerConnection.createOffer()
-            .then(offer => peerConnection.setLocalDescription(offer))
+            .then(offer => {
+                const optimizedOffer = new RTCSessionDescription({
+                    type: offer.type,
+                    sdp: optimizeSdp(offer.sdp)
+                });
+                return peerConnection.setLocalDescription(optimizedOffer);
+            })
             .then(() => {
                 sendSignal('offer', peerConnection.localDescription);
+                optimizePeerConnectionSenders();
             })
             .catch(e => console.error("Offer Error:", e));
     }
@@ -7006,6 +7187,7 @@ function handleIncomingSignal(signal) {
             peerConnection.setRemoteDescription(desc)
                 .then(() => {
                     if (ringingTimeout) clearTimeout(ringingTimeout);
+                    optimizePeerConnectionSenders();
                     isCallConnected = true;
                     console.log("Remote Description Set (Answer)");
                     callStatusText.innerText = "Connected";
@@ -7052,9 +7234,16 @@ acceptCallBtn.addEventListener('click', () => {
                 const desc = new RTCSessionDescription(incomingSignalData.data);
                 peerConnection.setRemoteDescription(desc)
                     .then(() => peerConnection.createAnswer())
-                    .then(answer => peerConnection.setLocalDescription(answer))
+                    .then(answer => {
+                        const optimizedAnswer = new RTCSessionDescription({
+                            type: answer.type,
+                            sdp: optimizeSdp(answer.sdp)
+                        });
+                        return peerConnection.setLocalDescription(optimizedAnswer);
+                    })
                     .then(() => {
                         sendSignal('answer', peerConnection.localDescription);
+                        optimizePeerConnectionSenders();
                         isCallConnected = true;
                         callStatusText.innerText = "Connected";
                         startCallTimer();
@@ -7317,17 +7506,27 @@ callFlipBtn.addEventListener('click', async (e) => {
         callFacingMode = callFacingMode === 'user' ? 'environment' : 'user';
         try {
             const newStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: callFacingMode }
+                video: {
+                    facingMode: callFacingMode,
+                    width: { ideal: 720, max: 1280 },
+                    height: { ideal: 1280, max: 1920 },
+                    frameRate: { ideal: 30, max: 30 }
+                }
             });
             const newVideoTrack = newStream.getVideoTracks()[0];
 
             // Replace track in Peer Connection
-            const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-            if (sender) await sender.replaceTrack(newVideoTrack);
+            if (peerConnection) {
+                const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+                if (sender) {
+                    await sender.replaceTrack(newVideoTrack);
+                    optimizePeerConnectionSenders();
+                }
+            }
 
             // Update local callStream object
             const oldVideoTrack = callStream.getVideoTracks()[0];
-            callStream.removeTrack(oldVideoTrack);
+            if (oldVideoTrack) callStream.removeTrack(oldVideoTrack);
             callStream.addTrack(newVideoTrack);
 
             updateVideoMirroring();
@@ -7335,7 +7534,7 @@ callFlipBtn.addEventListener('click', async (e) => {
 
             // Restore Mute State
             if (newVideoTrack) newVideoTrack.enabled = !isVideoMuted;
-        } catch (err) { console.error(err); }
+        } catch (err) { console.error("Camera flip error:", err); }
     }
 });
 
