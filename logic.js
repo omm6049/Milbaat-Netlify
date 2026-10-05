@@ -966,8 +966,8 @@ window.updateHeaderProfilePic = function () {
             height: 100%;
             object-fit: cover;
             object-position: center center;
-            transform: translateZ(0);
-            -webkit-transform: translateZ(0);
+            transform: scaleX(-1) translateZ(0);
+            -webkit-transform: scaleX(-1) translateZ(0);
             backface-visibility: hidden;
             -webkit-backface-visibility: hidden;
             image-rendering: -webkit-optimize-contrast;
@@ -984,8 +984,8 @@ window.updateHeaderProfilePic = function () {
             object-fit: cover; 
             object-position: center center;
             cursor: move; background-color: #000;
-            transform: translateZ(0);
-            -webkit-transform: translateZ(0);
+            transform: scaleX(-1) translateZ(0);
+            -webkit-transform: scaleX(-1) translateZ(0);
             backface-visibility: hidden;
             -webkit-backface-visibility: hidden;
             image-rendering: -webkit-optimize-contrast;
@@ -997,6 +997,8 @@ window.updateHeaderProfilePic = function () {
             filter: contrast(1.04) saturate(1.08) brightness(1.02);
             object-fit: cover;
             object-position: center center;
+            transform: scaleX(-1) translateZ(0);
+            -webkit-transform: scaleX(-1) translateZ(0);
         }
         /* Custom PiP View Styles */
         #custom-pip-view {
@@ -7541,24 +7543,20 @@ callVideoMuteBtn.addEventListener('click', (e) => {
 function updateVideoMirroring() {
     if (!isVideoCall) return;
 
-    const isLocalInSmallBox = (callLocalVideo.srcObject === callStream);
-
-    if (isLocalInSmallBox) {
-        callLocalVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)';
-        callRemoteVideo.style.transform = 'translateZ(0)';
-    } else {
-        callRemoteVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)';
-        callLocalVideo.style.transform = 'translateZ(0)';
+    // Mirror both self-view and other person's remote view so everything is seen as a mirror reflection
+    if (callLocalVideo) {
+        callLocalVideo.style.transform = 'scaleX(-1) translateZ(0)';
+        callLocalVideo.style.webkitTransform = 'scaleX(-1) translateZ(0)';
+    }
+    if (callRemoteVideo) {
+        callRemoteVideo.style.transform = 'scaleX(-1) translateZ(0)';
+        callRemoteVideo.style.webkitTransform = 'scaleX(-1) translateZ(0)';
     }
 
     const pipVideo = document.getElementById('pip-remote-video');
     if (pipVideo) {
-        const isLocalInBigBox = (callRemoteVideo.srcObject === callStream);
-        if (isLocalInBigBox) {
-            pipVideo.style.transform = (callFacingMode === 'user') ? 'scaleX(-1) translateZ(0)' : 'translateZ(0)';
-        } else {
-            pipVideo.style.transform = 'translateZ(0)';
-        }
+        pipVideo.style.transform = 'scaleX(-1) translateZ(0)';
+        pipVideo.style.webkitTransform = 'scaleX(-1) translateZ(0)';
     }
 }
 
